@@ -4,6 +4,7 @@
 Server::Server(QObject *parent) :
     QTcpServer(parent)
 {
+    connectedUser = {};
 }
 
 Server::~Server()
@@ -38,19 +39,40 @@ void Server::incomingConnection(qintptr socketDescriptor)
     // We have a new connection
     qDebug() << socketDescriptor << " Connecting...";
 
-    ServerThread *thread = new ServerThread(socketDescriptor, this);
-
-    // connect signal/slot
-    // once a thread is not needed, it will be beleted later
-    connect(thread, SIGNAL(finished()), thread, SLOT(deleteLater()));
-    connect(thread, SIGNAL(messageRecieved(QString)),
-        this, SLOT(updateChatroom(QString)));
-    //emit valueChanged(QString("hello %1").arg(i));
-
-    thread->start();
+    // dynamically created, haven't deleted
+    //QTcpSocket client = *(this->nextPendingConnection());
+    //connectedUser.append(*this->nextPendingConnection());
+    //QTcpSocket client = this->nextPendingConnection();
+    connectedUser.append(*this->nextPendingConnection());
+    QTcpSocket * client = &connectedUser.back();
+    /*
+    if(!client->setSocketDescriptor(socketDescriptor))
+    {
+        // something's wrong, we just emit a signal
+        emit error(client->error());
+        return;
+    }
+    */
+    //connect(client, &QTcpSocket::readyRead, this, SLOT(sendToAll()));
+    QObject::connect(client, &QTcpSocket::readyRead, [this,client]()
+    {
+        //qDebug() << client->readAll();
+        QByteArray data = client->readAll();
+        //QString qmessage(Data);
+        sendToAll(data);
+    });
 }
 
 void Server::updateChatroom(QString text)
 {
+    //not used
     emit updateUI(text);
+}
+
+void Server::sendToAll(QByteArray data)
+{
+    for (connectedUserIter = connectedUser.begin(); connectedUserIter != connectedUser.end(); connectedUserIter++)
+    {
+        connectedUserIter->write(data);
+    }
 }
