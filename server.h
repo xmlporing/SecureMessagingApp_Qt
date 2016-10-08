@@ -18,7 +18,7 @@ public:
 
 private:
     QVector<QTcpSocket> connectedUser;
-    QVector<QTcpSocket>::iterator connectedUserIter;
+    //QVector<QTcpSocket>::iterator connectedUserIter;
 
 signals:
     void updateUI(QString);

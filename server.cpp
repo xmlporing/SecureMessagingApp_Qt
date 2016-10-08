@@ -43,16 +43,9 @@ void Server::incomingConnection(qintptr socketDescriptor)
     //QTcpSocket client = *(this->nextPendingConnection());
     //connectedUser.append(*this->nextPendingConnection());
     //QTcpSocket client = this->nextPendingConnection();
+    /*
     connectedUser.append(*this->nextPendingConnection());
     QTcpSocket * client = &connectedUser.back();
-    /*
-    if(!client->setSocketDescriptor(socketDescriptor))
-    {
-        // something's wrong, we just emit a signal
-        emit error(client->error());
-        return;
-    }
-    */
     //connect(client, &QTcpSocket::readyRead, this, SLOT(sendToAll()));
     QObject::connect(client, &QTcpSocket::readyRead, [this,client]()
     {
@@ -61,6 +54,7 @@ void Server::incomingConnection(qintptr socketDescriptor)
         //QString qmessage(Data);
         sendToAll(data);
     });
+    */
 }
 
 void Server::updateChatroom(QString text)
@@ -71,8 +65,10 @@ void Server::updateChatroom(QString text)
 
 void Server::sendToAll(QByteArray data)
 {
+    /*
     for (connectedUserIter = connectedUser.begin(); connectedUserIter != connectedUser.end(); connectedUserIter++)
     {
         connectedUserIter->write(data);
     }
+    */
 }

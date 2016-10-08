@@ -145,6 +145,7 @@ void Manager::showCreateGroup()
 
 void Manager::hostServer()
 {
+    /*
     //Run server
     qDebug() << "Running server at port 1234";
 
@@ -155,7 +156,7 @@ void Manager::hostServer()
     //Start thread
     //mThread->start();
     socServer->startServer();
-
+    */
     //show chatroom
     showChatRoom();
 }
