@@ -95,21 +95,22 @@ void Manager::showChatGroup()
     //close server if on;
     if (socServer){
         socServer->closeServer();
+        delete socServer;
         socServer = NULL;
+        qDebug() << "Server closed";
+    }
+    //close client socket if on
+    if (clientSocket){
+        //removing
+        clientSocket->write( qPrintable(getUsername() + tr(" disconnected.")) );
+        //close socket
+        clientSocket->close();
     }
     chatGrpUi->show();
 }
 
 void Manager::showChatRoom()
 {
-    /*
-    if(!chatRmUi){
-        chatRmUi = new Chatroom(this, username);
-        connect(chatRmUi, SIGNAL(leaveRoom()), this, SLOT(showChatGroup()));
-        chatRmUi->setModal(true);
-        //connect(chatRmUi, SIGNAL(leaveRoom()), chatGrpUi, SLOT(exec()));
-    }
-    */
     //chatRmUi = new Chatroom(this, username);
     clientSocket = new QTcpSocket(this);
     connect(clientSocket, SIGNAL(connected()), this, SLOT(chatRoomConnected()));
@@ -145,18 +146,14 @@ void Manager::showCreateGroup()
 
 void Manager::hostServer()
 {
-    /*
     //Run server
     qDebug() << "Running server at port 1234";
 
     socServer = new Server(this);
     // connect signal/slot
     connect(socServer, SIGNAL(updateUI(QString)), this, SLOT(displayMsg(QString)));
-
-    //Start thread
-    //mThread->start();
     socServer->startServer();
-    */
+
     //show chatroom
     showChatRoom();
 }
@@ -172,7 +169,10 @@ void Manager::chatRoomConnected()
 
 void Manager::chatRoomDisconnected()
 {
+    //need read, http://stackoverflow.com/questions/32601867/can-i-use-qtcpsocket-again-for-another-connection-after-deletelater
     qDebug() << "Disconnected";
+    //delete socket
+    clientSocket->deleteLater();
 }
 
 void Manager::chatRoomReadyRead()
@@ -185,5 +185,7 @@ void Manager::chatRoomReadyRead()
 
 void Manager::chatRoomSendMsg(QString msg)
 {
-    clientSocket->write( qPrintable(msg) );
+    if (clientSocket){
+        clientSocket->write( qPrintable(msg) );
+    }
 }

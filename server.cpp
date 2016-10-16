@@ -9,7 +9,6 @@ Server::Server(QObject *parent) :
 
 Server::~Server()
 {
-    this->close();
     qDebug() << "Closing server";
 }
 
@@ -30,7 +29,14 @@ void Server::startServer()
 
 void Server::closeServer()
 {
-    delete this;
+    //delete all connected qtcpsocket
+    qDeleteAll(connectedUser.begin(), connectedUser.end());
+    //clear QVector
+    connectedUser.clear();
+    //release memory from QVector as no longer clear as of Qt5.7
+    connectedUser.squeeze();
+    //close this server
+    this->close();
 }
 
 // Slots
@@ -39,14 +45,11 @@ void Server::incomingConnection(qintptr socketDescriptor)
     // We have a new connection
     qDebug() << socketDescriptor << " Connecting...";
 
-    // dynamically created, haven't deleted
-    //QTcpSocket client = *(this->nextPendingConnection());
-    //connectedUser.append(*this->nextPendingConnection());
-    //QTcpSocket client = this->nextPendingConnection();
-    /*
-    connectedUser.append(*this->nextPendingConnection());
-    QTcpSocket * client = &connectedUser.back();
-    //connect(client, &QTcpSocket::readyRead, this, SLOT(sendToAll()));
+
+    QTcpSocket * client = new QTcpSocket();
+    client->setSocketDescriptor(socketDescriptor);
+    connectedUser.append(client);
+
     QObject::connect(client, &QTcpSocket::readyRead, [this,client]()
     {
         //qDebug() << client->readAll();
@@ -54,21 +57,22 @@ void Server::incomingConnection(qintptr socketDescriptor)
         //QString qmessage(Data);
         sendToAll(data);
     });
-    */
-}
 
-void Server::updateChatroom(QString text)
-{
-    //not used
-    emit updateUI(text);
 }
 
 void Server::sendToAll(QByteArray data)
 {
-    /*
-    for (connectedUserIter = connectedUser.begin(); connectedUserIter != connectedUser.end(); connectedUserIter++)
-    {
-        connectedUserIter->write(data);
+    int i = 0;
+    //may move to separate function
+    while (1){
+        if (i >= connectedUser.size())
+            break;
+        if (connectedUser[i]->state() == QAbstractSocket::ConnectedState){
+            connectedUser[i]->write(data);
+            ++i;
+        }else{
+            connectedUser.remove(i);
+        }
     }
-    */
+    qDebug() << "Number of connected users " << connectedUser.size();
 }

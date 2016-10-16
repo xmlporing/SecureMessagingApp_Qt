@@ -5,7 +5,7 @@
 #include <QTcpServer>
 #include <QString>
 #include <QVector>
-#include "serverthread.h"
+#include <QTcpSocket>
 
 class Server : public QTcpServer
 {
@@ -17,12 +17,10 @@ public:
     void closeServer();
 
 private:
-    QVector<QTcpSocket> connectedUser;
-    //QVector<QTcpSocket>::iterator connectedUserIter;
+    QVector<QTcpSocket *> connectedUser;
 
 signals:
-    void updateUI(QString);
-    void error(QTcpSocket::SocketError socketerror);
+    //void error(QTcpSocket::SocketError socketerror);
 
 public slots:
     void updateChatroom(QString);

@@ -18,7 +18,6 @@ SOURCES += main.cpp\
     chatroom.cpp \
     creategroup.cpp \
     createaccount.cpp \
-    serverthread.cpp \
     server.cpp \
     manager.cpp
 
@@ -29,7 +28,6 @@ HEADERS  += mainwindow.h \
     chatroom.h \
     creategroup.h \
     createaccount.h \
-    serverthread.h \
     server.h \
     manager.h
 
