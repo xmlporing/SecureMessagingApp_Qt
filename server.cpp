@@ -17,7 +17,7 @@ void Server::startServer()
 {
     int port = 1234;
 
-    if(!this->listen(QHostAddress::LocalHost,port))
+    if(!this->listen(QHostAddress::Any,port))
     {
         qDebug() << "Could not start server";
     }
@@ -30,7 +30,7 @@ void Server::startServer()
 void Server::closeServer()
 {
     //delete all connected qtcpsocket
-    qDeleteAll(connectedUser.begin(), connectedUser.end());
+    //qDeleteAll(connectedUser.begin(), connectedUser.end());
     //clear QVector
     connectedUser.clear();
     //release memory from QVector as no longer clear as of Qt5.7
@@ -48,7 +48,15 @@ void Server::incomingConnection(qintptr socketDescriptor)
 
     QTcpSocket * client = new QTcpSocket();
     client->setSocketDescriptor(socketDescriptor);
-    connectedUser.append(client);
+
+    whiteListObj * whitelistStruct = new whiteListObj();
+    //whitelistStruct = (whiteListObj) {"127.0.0.1", "Something", 1, client, 1};
+    whitelistStruct->IPaddress = "127.0.0.1";
+    whitelistStruct->userName = "something";
+    whitelistStruct->userId = 1;
+    whitelistStruct->socket = client;
+    whitelistStruct->nonce = 1;
+    connectedUser.append(whitelistStruct);
 
     QObject::connect(client, &QTcpSocket::readyRead, [this,client]()
     {
@@ -67,8 +75,8 @@ void Server::sendToAll(QByteArray data)
     while (1){
         if (i >= connectedUser.size())
             break;
-        if (connectedUser[i]->state() == QAbstractSocket::ConnectedState){
-            connectedUser[i]->write(data);
+        if (connectedUser[i]->socket->state() == QAbstractSocket::ConnectedState){
+            connectedUser[i]->socket->write(data);
             ++i;
         }else{
             connectedUser.remove(i);

@@ -10,6 +10,14 @@
 class Server : public QTcpServer
 {
     Q_OBJECT
+
+    struct whiteListObj{
+        QString IPaddress;
+        QString userName;
+        qint32 userId;
+        QTcpSocket * socket;
+        qint32 nonce;
+    };
 public:
     explicit Server(QObject *parent = 0);
     ~Server();
@@ -17,17 +25,16 @@ public:
     void closeServer();
 
 private:
-    QVector<QTcpSocket *> connectedUser;
+    QVector<whiteListObj *> connectedUser;
 
 signals:
     //void error(QTcpSocket::SocketError socketerror);
 
 public slots:
-    void updateChatroom(QString);
     void sendToAll(QByteArray);
 
 protected:
-    void incomingConnection(qintptr socketDescriptor);
+    void incomingConnection(qintptr socketDescriptor);    
 
 };
 
