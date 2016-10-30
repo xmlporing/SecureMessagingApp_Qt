@@ -6,4 +6,10 @@
 
 #include <QDebug>
 
+// Resources link
+/*
+ * Temp dump
+ * Loading screen: http://www.ajaxload.info/#preview
+ */
+
 #endif // LIBRARY_H

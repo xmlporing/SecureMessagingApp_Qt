@@ -19,7 +19,8 @@ SOURCES += main.cpp\
     creategroup.cpp \
     createaccount.cpp \
     server.cpp \
-    manager.cpp
+    manager.cpp \
+    sslclient.cpp
 
 
 HEADERS  += mainwindow.h \
@@ -29,7 +30,9 @@ HEADERS  += mainwindow.h \
     creategroup.h \
     createaccount.h \
     server.h \
-    manager.h
+    manager.h \
+    sslclient.h \
+    loadingscreen.h
 
 FORMS    += mainwindow.ui \
     chatgroup.ui \
@@ -37,3 +40,5 @@ FORMS    += mainwindow.ui \
     creategroup.ui \
     createaccount.ui
 
+RESOURCES += \
+    resource.qrc

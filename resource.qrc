@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>cert/apache.crt</file>
+        <file>img/loader2.gif</file>
+    </qresource>
+</RCC>

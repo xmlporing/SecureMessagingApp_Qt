@@ -12,12 +12,24 @@ Manager::Manager(QObject *parent) : QObject(parent)
 
     //user data init
     username = tr("");
+    token = tr("");
     socServer = NULL;
 
-    //connect
+    //warning dialog
+    loadScreen = new LoadingScreen();
+
+    //timer
+    timer = new QTimer(this);
+    timer->setSingleShot(true);
+    connect(timer, &QTimer::timeout, [this](){
+       loadWaitScreen(false);
+    });
+
+    //mainwindow connect
     connect(startWindowUi, SIGNAL(signIn(QString, QString)),
             this, SLOT(login(QString, QString)));
     connect(startWindowUi, SIGNAL(createAcc()), this, SLOT(registerAcc()));
+    connect(&httpsClient, SIGNAL(returnToken(const QString &, const QString &)), this, SLOT(successfulLogin(const QString &, const QString &)));
 }
 
 Manager::~Manager()
@@ -29,22 +41,16 @@ Manager::~Manager()
     //delete createGrpUi;
 }
 
-// Setters
-void Manager::setUsername(QString user)
-{
-    username = user;
-}
-
-// Getters
-const QString &Manager::getUsername()
-{
-    return username;
-}
-
 // Slots
 void Manager::login(QString username, QString pass)
 {
-    // can do all the validation here
+    // User validation
+    httpsClient.runClient(username, pass);
+
+    //wait screen
+    loadWaitScreen(true);
+
+    /*
     // if username and password is success
     if (username != "user" && pass != "password")
     {
@@ -54,21 +60,33 @@ void Manager::login(QString username, QString pass)
     }
     else
     {
-        setUsername(username);
-        //hide main
-        startWindowUi->hide();
 
-        //check if chat group created before
-        if(!chatGrpUi){
-            qDebug() << "create chat group";
-            chatGrpUi = new Chatgroup(startWindowUi);
-            connect(chatGrpUi, SIGNAL(goMain()), this, SLOT(showMain())); //connect
-            connect(chatGrpUi, SIGNAL(joinRoom()), this, SLOT(showChatRoom()));
-            connect(chatGrpUi, SIGNAL(makeGroup()), this, SLOT(showCreateGroup()));
-            chatGrpUi->setModal(true);
-        }
-        chatGrpUi->show();
     }
+    */
+}
+
+void Manager::successfulLogin(const QString &username,const QString &token)
+{
+    //set variables
+    setUsername(username);
+    setToken(token);
+
+    //hide loading
+    loadWaitScreen(false);
+
+    //hide main
+    startWindowUi->hide();
+
+    //check if chat group created before
+    if(!chatGrpUi){
+        qDebug() << "create chat group";
+        chatGrpUi = new Chatgroup(startWindowUi);
+        connect(chatGrpUi, SIGNAL(goMain()), this, SLOT(showMain())); //connect
+        connect(chatGrpUi, SIGNAL(joinRoom()), this, SLOT(showChatRoom()));
+        connect(chatGrpUi, SIGNAL(makeGroup()), this, SLOT(showCreateGroup()));
+        chatGrpUi->setModal(true);
+    }
+    chatGrpUi->show();
 }
 
 void Manager::registerAcc()
@@ -118,9 +136,9 @@ void Manager::showChatRoom()
     //connect(clientSocket, SIGNAL(bytesWritten(qint64)), this, SLOT(bytesWritten(qint64)));
     connect(clientSocket, SIGNAL(readyRead()), this, SLOT(chatRoomReadyRead()));
 
-    clientSocket->connectToHost("127.0.0.1", 1234);
+    clientSocket->connectToHost("192.168.1.134", 1234);
 
-    if(!clientSocket->waitForConnected(5000))
+    if(!clientSocket->waitForConnected(TIMEOUT))
     {
         qDebug() << "Error: " << clientSocket->errorString();
     }
@@ -164,7 +182,7 @@ void Manager::displayMsg(QString msg){
 
 void Manager::chatRoomConnected()
 {
-    clientSocket->write( qPrintable(getUsername() + tr(" connected.")) );
+    clientSocket->write( QByteArray("0") + qPrintable(getUsername()) );
 }
 
 void Manager::chatRoomDisconnected()

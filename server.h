@@ -7,6 +7,10 @@
 #include <QVector>
 #include <QTcpSocket>
 
+struct whitelistObj{
+
+};
+
 class Server : public QTcpServer
 {
     Q_OBJECT
@@ -18,12 +22,12 @@ public:
 
 private:
     QVector<QTcpSocket *> connectedUser;
+    QByteArray convertedData(const QByteArray &);
 
 signals:
     //void error(QTcpSocket::SocketError socketerror);
 
 public slots:
-    void updateChatroom(QString);
     void sendToAll(QByteArray);
 
 protected:
