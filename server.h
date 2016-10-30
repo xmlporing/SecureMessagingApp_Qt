@@ -29,12 +29,9 @@ public:
     void closeServer();
 
 private:
-<<<<<<< HEAD
-    QVector<QTcpSocket *> connectedUser;
+    //QVector<QTcpSocket *> connectedUser;
     QByteArray convertedData(const QByteArray &);
-=======
     QVector<whiteListObj *> connectedUser;
->>>>>>> 5a7d41f20ebba0ea546e8a866e76f168ef5b199b
 
 signals:
     //void error(QTcpSocket::SocketError socketerror);

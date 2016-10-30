@@ -129,7 +129,6 @@ void Manager::showChatGroup()
 
 void Manager::showChatRoom()
 {
-    //chatRmUi = new Chatroom(this, username);
     clientSocket = new QTcpSocket(this);
     connect(clientSocket, SIGNAL(connected()), this, SLOT(chatRoomConnected()));
     connect(clientSocket, SIGNAL(disconnected()), this, SLOT(chatRoomDisconnected()));
