@@ -7,10 +7,10 @@ SSLClient::SSLClient(QObject *parent) : QObject(parent)
     // connect(manager, SIGNAL(sslErrors(QNetworkReply *, const QList<QSslError> &)), this, SLOT(onSslErrors(QNetworkReply*, const QList<QSslError> &)));
 
     // ignore self-signed cert issues
-    QList<QSslCertificate> cert = QSslCertificate::fromPath(":/cert/apache.crt");
-    expectedSslErrors.append(QSslError(QSslError::SelfSignedCertificate, cert.at(0)));
-    expectedSslErrors.append(QSslError(QSslError::HostNameMismatch,cert.at(0)));
-    expectedSslErrors.append(QSslError(QSslError::CertificateUntrusted ,cert.at(0)));
+//    QList<QSslCertificate> cert = QSslCertificate::fromPath(":/cert/apache.crt");
+//    expectedSslErrors.append(QSslError(QSslError::SelfSignedCertificate, cert.at(0)));
+//    expectedSslErrors.append(QSslError(QSslError::HostNameMismatch,cert.at(0)));
+//    expectedSslErrors.append(QSslError(QSslError::CertificateUntrusted ,cert.at(0)));
 }
 
 void SSLClient::runClient(const QString &username, const QString &password)
@@ -26,7 +26,7 @@ void SSLClient::runClient(const QString &username, const QString &password)
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+    reply->ignoreSslErrors();
     connect(reply, &QNetworkReply::finished, [this, username](){
         finishedReply(username);
     });
