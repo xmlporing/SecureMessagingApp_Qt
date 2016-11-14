@@ -2,5 +2,8 @@
     <qresource prefix="/">
         <file>cert/apache.crt</file>
         <file>img/loader2.gif</file>
+        <file>img/Loading_icon.gif</file>
+        <file>img/loading-transparent.gif</file>
+        <file>img/Loading_icon_new.gif</file>
     </qresource>
 </RCC>

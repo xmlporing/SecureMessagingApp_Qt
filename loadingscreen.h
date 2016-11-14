@@ -12,9 +12,10 @@ class LoadingScreen:public QSplashScreen
 {
   Q_OBJECT
   public:
-    LoadingScreen():movie(":/img/loader2.gif")
+    LoadingScreen():movie(":/img/Loading_icon_new.gif")
     {
         this->installEventFilter(this);
+        movie.start();
         connect(&movie,SIGNAL(updated(QRect)),this,SLOT(frameUpdate()));
     }
 
@@ -45,7 +46,7 @@ class LoadingScreen:public QSplashScreen
   private slots:
     void frameUpdate()
     {
-      setPixmap(movie.currentPixmap().scaled(400,300,Qt::KeepAspectRatio));
+        setPixmap(movie.currentPixmap().scaled(400,300,Qt::KeepAspectRatio));
     }
 
   private:

@@ -72,7 +72,7 @@ void SSLClient::chatRoomToken(const QString &username, const QString &token, con
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+    reply->ignoreSslErrors();
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveChatroomToken();
     });
