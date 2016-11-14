@@ -3,7 +3,6 @@
 
 #include <QDialog>
 #include <QDateTime>
-
 #include <QDebug>
 
 // Resources link

@@ -16,6 +16,19 @@ Chatgroup::~Chatgroup()
     delete ui;
 }
 
+void Chatgroup::addChatRoom(QString username){
+    qDebug() << "Adding user " << username;
+    //ui->listWidget->addItem(username);
+}
+
+void Chatgroup::removeChatRoom(QString username){
+   // QList<QListWidgetItem *> result = ui->listWidget->findItems(username, Qt::MatchFixedString);
+    //if (!(result.size() < 1))
+        //remove it
+        //delete result.at(0);
+    qDebug() << "Removing user " << username;
+}
+
 // Slots
 void Chatgroup::on_joinButton_clicked()
 {

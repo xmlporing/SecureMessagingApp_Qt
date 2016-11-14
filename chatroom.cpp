@@ -19,29 +19,30 @@ Chatroom::~Chatroom()
 }
 
 // Display
-void Chatroom::displayMsg(QString msg)
+void Chatroom::displayMsg(QString sender, QString msg)
 {
     QTime time = QTime::currentTime();
     QString timeString = time.toString();
 
-    ui->textBrowser->append(QString("%1 [%2] : %3").arg(user,timeString,msg));
+    ui->textBrowser->append(QString("%1 [%2] : %3").arg(sender,timeString,msg));
+}
+
+void Chatroom::addUser(QString username){
+    qDebug() << "Adding user " << username;
+    ui->listWidget->addItem(username);
+}
+
+void Chatroom::removeUser(QString username){
+    QList<QListWidgetItem *> result = ui->listWidget->findItems(username, Qt::MatchFixedString);
+    if (!(result.size() < 1))
+        //remove it
+        delete result.at(0);
+    qDebug() << "Removing user " << username;
 }
 
 // Slots
 void Chatroom::on_sendMsgbtn_clicked()
 {
-    /*
-    QTime time = QTime::currentTime();
-    //QDateTime datetime = QDateTime::currentDateTime();
-    QString timeString = time.toString();
-
-    if (ui->messageEdit->text() != ""){
-        ui->textBrowser->append(QString("%1 [%2] : %3").arg(user,timeString,ui->messageEdit->text()));
-        //ui->textBrowser->append(&user +"Username: " +ui->messageEdit->text()); alternate way
-
-    }
-    ui->messageEdit->clear();
-    */
     //displayMsg();
     QString msg;
     msg = ui->messageEdit->text();
@@ -49,7 +50,8 @@ void Chatroom::on_sendMsgbtn_clicked()
         return;
     }
     ui->messageEdit->clear();
-
+    //Debug, sending msg to chat group
+    qDebug() << "Chatroom::on_sendMsgbtn_clicked -> Sending " << msg << " to chat group";
     emit typeMsg(msg);
 }
 

@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QTcpSocket>
+#include <QMessageBox>
 #include "mainwindow.h"
 #include "createaccount.h"
 #include "chatgroup.h"
@@ -10,12 +11,13 @@
 #include "creategroup.h"
 #include "server.h"
 #include "sslclient.h"
+#include "chatclient.h"
 
 #include <QDebug> //debug purpose
 
 #include "loadingscreen.h" //loading screen
 
-#define TIMEOUT 5000
+#define LTIMEOUT 5000
 
 class Manager : public QObject
 {
@@ -31,13 +33,13 @@ private:
     Chatgroup *chatGrpUi;
     Chatroom *chatRmUi;
     CreateGroup *createGrpUi;
-    //user data, converting to struct
+    QWidget* currentUi;
+    //user data
     QString username;
     QString token;
-    //token, private key
     //server
     Server *socServer;
-    QTcpSocket *clientSocket;
+    ChatClient *socClient;
     //HTTPS client
     SSLClient httpsClient;
     //Warn Dialog
@@ -46,7 +48,7 @@ private:
         if (run){
             loadScreen->show();
             loadScreen->startLoading();
-            timer->start(TIMEOUT);
+            timer->start(LTIMEOUT);
         }else{
             if (timer->isActive())
                 timer->stop();
@@ -69,6 +71,8 @@ private:
     const QString &getToken(){
         return this->token;
     }
+    //Messagebox
+    void displayMessageBox(QString msg);
 
 signals:
 
@@ -81,11 +85,12 @@ public slots:
     void showChatRoom();
     void showCreateGroup();
     void hostServer();
-    void displayMsg(QString);
+    void displayMsg(QString user, QString msg);
     void chatRoomConnected();
     void chatRoomDisconnected();
-    void chatRoomReadyRead();
-    void chatRoomSendMsg(QString);
+    void chatRoomSendMsg(QString msg);
+    void chatRoomFull();
+    void verifyChatRoomToken(QString token);
 };
 
 #endif // MANAGER_H

@@ -14,7 +14,9 @@ class Chatroom : public QDialog
 public:
     explicit Chatroom(QWidget *parent = 0, QString currUser = NULL);
     ~Chatroom();
-    void displayMsg(QString msg = "");
+    void displayMsg(QString sender, QString msg);
+    void addUser(QString username);
+    void removeUser(QString username);
 
 private:
     Ui::Chatroom *ui;

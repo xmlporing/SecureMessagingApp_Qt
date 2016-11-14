@@ -23,6 +23,17 @@ void CreateAccount::on_backbtn_clicked()
 
 void CreateAccount::on_createAccountbtn_clicked()
 {
-    this->hide();
-    emit goMain();
+    QString username = this->ui->newUserName->text();
+    QString password1 = this->ui->newPassword->text();
+    QString password2 = this->ui->newCPassword->text();
+    QRegularExpression regex("^[a-zA-Z0-9]{8,16}$");
+    if (password1 != password2)
+        return;
+    QRegularExpressionMatch match = regex.match(password1);
+    if (!match.hasMatch())
+        return;
+    match = regex.match(username);
+    if (!match.hasMatch())
+        return;
+    emit registerAcc(username, password1);
 }

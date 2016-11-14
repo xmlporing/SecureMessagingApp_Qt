@@ -14,6 +14,8 @@ class Chatgroup : public QDialog
 public:
     explicit Chatgroup(QWidget *parent = 0);
     ~Chatgroup();
+    void addChatRoom(QString username);
+    void removeChatRoom(QString username);
 
 private slots:
     void on_joinButton_clicked();
