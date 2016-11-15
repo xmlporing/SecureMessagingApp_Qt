@@ -14,21 +14,25 @@ class Chatgroup : public QDialog
 public:
     explicit Chatgroup(QWidget *parent = 0);
     ~Chatgroup();
-    void addChatRoom(QString username);
-    void removeChatRoom(QString username);
+    void addChatGroup(QString groupName, int groupSize,
+                     int groupCount, QString ip);
+    void refreshList();
 
 private slots:
     void on_joinButton_clicked();
     void on_logoutButton_clicked();
     void on_createGroupbtn_clicked();
+    void on_refreshButton_clicked();
 
 private:
     Ui::Chatgroup *ui;
 
 signals:
+    void errorOccur(QString warningmsg);
     void goMain();
-    void joinRoom();
+    void joinRoom(QString groupName, QString ip);
     void makeGroup();
+    void updateGroupList();
 };
 
 #endif // CHATGROUP_H

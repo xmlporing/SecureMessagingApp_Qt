@@ -7,10 +7,13 @@ Chatroom::Chatroom(QWidget *parent, QString currUser) :
     ui(new Ui::Chatroom),
     user(currUser)
 {
+    //default setup ui
     ui->setupUi(this);
-
+    //set current time
     QDate date = QDate::currentDate();
     ui->textBrowser->append("-- " + date.toString() + " --");
+    //set for non selection
+    ui->listWidget->setSelectionMode(QAbstractItemView::NoSelection);
 }
 
 Chatroom::~Chatroom()
@@ -57,7 +60,5 @@ void Chatroom::on_sendMsgbtn_clicked()
 
 void Chatroom::on_returnBtn_clicked()
 {
-    this->hide();
-
     emit leaveRoom();
 }

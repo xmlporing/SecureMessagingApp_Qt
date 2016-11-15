@@ -2,6 +2,7 @@
 #define CREATEGROUP_H
 
 #include "library.h"
+#include <QHostAddress>
 
 namespace Ui {
 class CreateGroup;
@@ -21,11 +22,12 @@ private:
 private slots:
     void on_backButton_clicked();
     void on_createGroupbtn_clicked();
-    void hostLeave();
 
 signals:
+    void errorOccur(QString warningmsg);
     void cancelCreate();
-    void createdGroup();
+    void createdGroup(QString groupName, int groupSize,
+                      int groupCount, QString ip);
 };
 
 #endif // CREATEGROUP_H

@@ -10,13 +10,6 @@ ChatClient::ChatClient(QObject *parent) : QObject(parent)
 ChatClient::~ChatClient(){
 }
 
-void ChatClient::shut(){
-    init();
-    clientSoc->abort();
-    clientSoc->deleteLater(); //auto delete
-    clientSoc = NULL;
-}
-
 void ChatClient::init(){
     this->nonce = 0;
     this->ownID = 0;
@@ -26,28 +19,16 @@ void ChatClient::init(){
     this->userList.clear();
 }
 
+//setter
 void ChatClient::setUsername(QString username){
     this->ownUsername = username;
 }
 
-bool ChatClient::connectToHost(QString ip)
-{
-    // check for valid socket
-    if (!clientSoc){
-        this->clientSoc = new QTcpSocket(this);
-        //connect for connect, disconnect and readyread
-        connect(this->clientSoc, SIGNAL(connected()),this, SLOT(initConnection()));
-        connect(this->clientSoc, SIGNAL(readyRead()), this, SLOT(readPacket()));
-    }
-    // try to connect to host
-    clientSoc->connectToHost(ip, PORT);
-    // unable to connect after timeout
-    if (!clientSoc->waitForConnected(TIMEOUT))
-        return false;
-    // successfully connected
-    return true;
+void ChatClient::setGroupName(QString groupName){
+    this->ownGroupName = groupName;
 }
 
+//getter
 const bool& ChatClient::getConnectivity(){
     return connectionState;
 }
@@ -63,6 +44,36 @@ const QString ChatClient::getUsername(int userid){
     return QString();
 }
 
+//connection
+bool ChatClient::connectToHost(QString ip)
+{
+    // check for valid socket
+    if (!clientSoc){
+        this->clientSoc = new QTcpSocket(this);
+        //connect for connect, disconnect and readyread
+        connect(this->clientSoc, SIGNAL(connected()),this, SLOT(initConnection()));
+        connect(this->clientSoc, &QTcpSocket::disconnected, [this](){
+            emit error("You have been disconnected");
+        });
+        connect(this->clientSoc, SIGNAL(readyRead()), this, SLOT(readPacket()));
+    }
+    // try to connect to host
+    clientSoc->connectToHost(ip, PORT);
+    // unable to connect after timeout
+    if (!clientSoc->waitForConnected(TIMEOUT))
+        return false;
+    // successfully connected
+    return true;
+}
+
+void ChatClient::shut(){
+    init();
+    clientSoc->abort();
+    clientSoc->deleteLater(); //auto delete
+    clientSoc = NULL;
+}
+
+//packet
 void ChatClient::rejectPacket(EType error){
     // send PROTOCOL_TYPE::Reject with fixed 1 byte length
     QByteArray data;
@@ -97,6 +108,8 @@ void ChatClient::sendPacket(TType t, QString contents){
 
     if (this->clientSoc)
         this->clientSoc->write(data, PROTOCOL::HeaderSize + totalsize);
+    //save for resend
+    prevData = QByteArray(data);
 }
 
 void ChatClient::sendMsg(QString msg){
@@ -300,11 +313,11 @@ void ChatClient::readPacket()
         bool convertOk;
         int sendNonce = text.toInt(&convertOk); //default to 0 if fail
         //check for valid nonce
-        if (sendNonce != this->nonce){
+        if (sendNonce != this->nonce || !convertOk){
             rejectPacket(ERROR::InvalidSessionNonce);
         }else{
             //disconnect
-            emit disconnected();
+            emit error("Host has left the chatroom.");
         }
         break;
     }
@@ -314,16 +327,24 @@ void ChatClient::readPacket()
         EType e;
         dataStream >> e;
         switch(e){
+        case ERROR::InvalidSize:
+        {
+            //resend previous packet
+            if (this->clientSoc)
+                this->clientSoc->write(prevData, prevData.size());
+            break;
+        }
         case ERROR::InvalidToken:
             //re-init
             initConnection();
             break;
         case ERROR::RoomFull:
         {
+            qDebug() << "Room full error";
             //check if already connected (connectionState is true)
             if (!getConnectivity())
                 //notify user about room full
-                emit roomFull();
+                emit error("Chatroom is full.");
             break;
         }
         //illegal packet
@@ -349,13 +370,19 @@ void ChatClient::initConnection(){
     stream << TType(PROTOCOL_TYPE::Init)
            << LType(0);
 
-    if (this->clientSoc){
-        this->clientSoc->flush(); //flush previous packet
+    if (this->clientSoc)
         this->clientSoc->write(data, PROTOCOL::HeaderSize);
-    }
+    //save for resend
+    prevData = QByteArray(data);
 }
 
 void ChatClient::sendServerVerify(QString sessionkey,QString verifyIV, QString encAuth){
+    /*
+     * This function attempt to host chat server with specified group size
+     *
+     * Input: int groupSize for limiting number of connected user
+     * Output: Server start listening at PORT
+     */
     // set key
     if (!Custom::setKey(this->key, sessionkey))
         return;
@@ -378,4 +405,6 @@ void ChatClient::sendServerVerify(QString sessionkey,QString verifyIV, QString e
 
     if (this->clientSoc)
         this->clientSoc->write(data, PROTOCOL::HeaderSize + totalsize);
+    //save for resend
+    prevData = QByteArray(data);
 }

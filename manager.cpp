@@ -2,25 +2,29 @@
 
 Manager::Manager(QObject *parent) : QObject(parent)
 {
-    //UI init
+    //UI  / pages init
     startWindowUi = new MainWindow();
-    currentUi = startWindowUi;
-    startWindowUi->show();
     createAccUi = NULL;
     chatGrpUi = NULL;
     chatRmUi = NULL;
     createGrpUi = NULL;
 
+    //track ui init
+    currentUi = NULL;
+    trackUi(startWindowUi);
+
     //user data init
     username = tr("");
     token = tr("");
+
+    //chat server init
     socServer = NULL;
     socClient = NULL;
 
-    //warning dialog
+    //warning dialog init
     loadScreen = new LoadingScreen();
 
-    //timer
+    //timer init
     timer = new QTimer(this);
     timer->setSingleShot(true);
     connect(timer, &QTimer::timeout, [this](){
@@ -31,16 +35,56 @@ Manager::Manager(QObject *parent) : QObject(parent)
     connect(startWindowUi, SIGNAL(signIn(QString, QString)),
             this, SLOT(login(QString, QString)));
     connect(startWindowUi, SIGNAL(createAcc()), this, SLOT(registerAcc()));
+
     //https client, communication to web server
-    connect(&httpsClient, SIGNAL(returnLoginToken(const QString &, const QString &)), this, SLOT(successfulLogin(const QString &, const QString &)));
-    connect(&httpsClient, &SSLClient::errorOccur, [this](QString msg){ displayMessageBox(msg); });
-    connect(&httpsClient, &SSLClient::returnChatRoomToken,
-        [this](const QString &chatsession, const QString &iv, const QString &encAuth){
-            if (this->socClient) { this->socClient->sendServerVerify(chatsession, iv, encAuth); }
+    // successful login
+    connect(&httpsClient, &SSLClient::returnLoginToken,[this](const QString& username, const QString& token){
+        this->successfulLogin(username, token);
     });
+    // successful logout
     connect(&httpsClient, &SSLClient::logoutSuccess, [this](){
-        this->username = "";
-        this->token = "";
+        //clear all details
+        this->setUsername("");
+        this->setToken("");
+        this->setGroupName("");
+        //go to main
+        this->trackUi(this->startWindowUi);
+    });
+    // chat group entry recieved
+    connect(&httpsClient, &SSLClient::newChatGroupList, [this]
+            (QString groupName, int groupSize,int groupCount, QString ip){
+        //update chat group list
+        this->chatGrpUi->addChatGroup(groupName, groupSize, groupCount, ip);
+    });
+    // successful chat room created
+    connect(&httpsClient, &SSLClient::createChatRoomSuccess, [this](){
+        //socServer will be destroyed if unable to host
+        if (this->socServer){
+            //ip will be converted to local
+            this->connectToChatRoom("");
+            //show chatroom
+            this->showChatRoom();
+        }
+    });
+    // successful chat room token recieved
+    connect(&httpsClient, &SSLClient::returnJoinChatRoomToken, [this]
+            (QString chatsession,QString iv, QString encAuth){
+        //send to verify with chat server
+        if(this->socClient){
+            this->socClient->sendServerVerify(chatsession, iv, encAuth);
+        }
+    });
+    // successful chat room count update
+    connect(&httpsClient, &SSLClient::updateChatRoomSuccess, [this](){
+        // success, dont need update UI
+    });
+    // successful chat room deletion
+    connect(&httpsClient, &SSLClient::updateChatRoomSuccess, [this](){
+        // success, dont need update UI
+    });
+    // recieve error, display it
+    connect(&httpsClient, &SSLClient::errorOccur, [this](QString msg){
+        displayMessageBox(msg);
     });
 }
 
@@ -50,12 +94,72 @@ Manager::~Manager()
     // auto delete rest of Ui;
 }
 
-void Manager::displayMessageBox(QString msg){
-    QMessageBox::warning(currentUi, "System Message", msg,QMessageBox::Ok);
-
+// track ui
+void Manager::trackUi(QWidget* newUi){
+    /*
+     * This function display error to user
+     *
+     * Signal/Call from: Any
+     * Input: New UI that suppose to show
+     * Output: Hide previous UI, show new UI
+     */
+    if(currentUi)
+        currentUi->hide();
+    currentUi = newUi;
+    currentUi->show();
 }
 
-// Slots
+// warning dialog
+void Manager::loadWaitScreen(bool run){
+    if (run){
+        loadScreen->show();
+        loadScreen->startLoading();
+        timer->start(LTIMEOUT);
+    }else{
+        if (timer->isActive())
+            timer->stop();
+        loadScreen->hide();
+        loadScreen->stopLoading();
+    }
+}
+
+// Setter
+void Manager::setUsername(QString user){
+    this->username = user;
+}
+void Manager::setToken(QString token){
+    this->token = token;
+}
+void Manager::setGroupName(QString groupName){
+    this->groupName = groupName;
+}
+
+// Getter
+const QString& Manager::getUsername(){
+    return this->username;
+}
+const QString& Manager::getToken(){
+    return this->token;
+}
+const QString& Manager::getGroupName(){
+    return this->groupName;
+}
+
+// Message box
+void Manager::displayMessageBox(QString msg){
+    /*
+     * This function display error to user
+     *
+     * Signal from: Any
+     * Input: Error message
+     * Output: QMessageBox with only "OK" option
+     */
+    QMessageBox::warning(currentUi, "System Message", msg,QMessageBox::Ok);
+}
+
+//
+
+// ******* Slots *******
 void Manager::login(QString username, QString pass)
 {
     /*
@@ -86,6 +190,7 @@ void Manager::successfulLogin(const QString &username,const QString &token)
      * Input: QString username and QString token
      * Output:
      *     UI transistion = startWindowUi to chatGrpUi
+     *     create chatGrpUi if has not been created
      */
     //set variables
     setUsername(username);
@@ -94,55 +199,92 @@ void Manager::successfulLogin(const QString &username,const QString &token)
     //hide loading
     loadWaitScreen(false);
 
-    //hide main
-    startWindowUi->hide();
+    //clear away user details
+    startWindowUi->clearUserDetails();
 
     //check if chat group created before
     if(!chatGrpUi){
         qDebug() << "create chat group";
         chatGrpUi = new Chatgroup(startWindowUi);
-        connect(chatGrpUi, SIGNAL(goMain()), this, SLOT(showMain())); //connect
-        connect(chatGrpUi, SIGNAL(joinRoom()), this, SLOT(showChatRoom()));
-        connect(chatGrpUi, SIGNAL(makeGroup()), this, SLOT(showCreateGroup()));
+        //connect signal
+        // logout
+        connect(chatGrpUi, &Chatgroup::goMain, [this](){
+            //attempt to logout
+            this->httpsClient.logoutAcc(this->getUsername(),this->getToken());
+        });
+        // join chat room
+        connect(chatGrpUi, &Chatgroup::joinRoom, [this](QString grpName, QString ip){
+            //set joined chat room name
+            this->setGroupName(grpName);
+            //connect to chat room
+            this->connectToChatRoom(ip);
+        });
+        // show create chat room UI
+        connect(chatGrpUi, &Chatgroup::makeGroup, [this](){
+            //show create chat room UI
+            this->showCreateGroup();
+        });
+        // refresh list
+        connect(chatGrpUi, &Chatgroup::updateGroupList, [this](){
+            //https get list
+            this->httpsClient.getChatRoom(this->getUsername(),this->getToken());
+        });
+        // error
+        connect(chatGrpUi, &Chatgroup::errorOccur, [this](QString errMsg){
+            //display error
+            this->displayMessageBox(errMsg);
+        });
         chatGrpUi->setModal(true);
     }
+    //refresh list
+    chatGrpUi->refreshList();
     //set currentUi
-    currentUi = chatGrpUi;
-    chatGrpUi->show();
+    trackUi(chatGrpUi);
 }
 
 void Manager::registerAcc()
 {
-    if(!createAccUi){
-        //createAccUi = new CreateAccount(this);
-        createAccUi = new CreateAccount(startWindowUi);
-        connect(createAccUi,SIGNAL(goMain()), this, SLOT(showMain()));
-        connect(createAccUi, &CreateAccount::registerAcc, [this](QString username, QString password){
-            //send to server to process
-            httpsClient.registerAcc(username, password);
-        });
-        createAccUi->setModal(true);
+    /*
+     * This function show registration UI
+     *
+     * Signal from: startWindowUi::createAcc
+     * Input: Nil
+     * Output: Show registration UI and create it if has not been created
+     */
+    //delete previous, so all details are deleted
+    if(createAccUi){
+        delete createAccUi;
+        createAccUi = NULL;
     }
-    currentUi = createAccUi;
+    //create new
+    createAccUi = new CreateAccount(startWindowUi);
+    //connect signal
+    // register account
+    connect(createAccUi, &CreateAccount::registerAcc, [this](QString username, QString password){
+        //send to server to process
+        httpsClient.registerAcc(username, password);
+    });
+    // error
+    connect(createAccUi, &CreateAccount::errorOccur, [this](QString errMsg){
+        //display error msg
+        this->displayMessageBox(errMsg);
+    });
+    createAccUi->setModal(true);
+    //show UI
     createAccUi->show();
-}
-
-void Manager::showMain()
-{
-    // clear username, user data
-    setUsername("");
-
-    currentUi = startWindowUi;
-    startWindowUi->show();
 }
 
 void Manager::showChatGroup()
 {
-    currentUi = chatGrpUi;
-    chatGrpUi->show();
+    /*
+     * This function show chatGrpUi after closing existing chat server/client
+     *
+     * Called from: Chatroom::leaveRoom, CreateGroup::cancelCreate,
+     * Input: QString username and QString token
+     * Output: Show chat group UI
+     */
     //close server if on;
     if (socServer){
-        socServer->closeServer();
         delete socServer;
         socServer = NULL;
         qDebug() << "Server closed";
@@ -151,93 +293,165 @@ void Manager::showChatGroup()
     if (socClient){
         socClient->shut();
         qDebug() << "Client related closed";
-        //delete socClient;
     }
+    //reset groupName
+    setGroupName("");
+    //set currentUi
+    trackUi(chatGrpUi);
 }
 
-void Manager::showChatRoom()
+void Manager::connectToChatRoom(QString ip)
 {
+    /*
+     * This function attempt to connect ip's chat server
+     * while creating a new chat client if it is not created
+     *
+     * Input: QString ip for client to connect
+     * Output: Show chat group UI
+     */
     //check if exist
     if (!socClient){
         socClient = new ChatClient(this);
-        //connect socClient
+        //connect signal
+        // displayMsg that chat client recieve
         connect(socClient, SIGNAL(displayMsg(QString,QString)), this, SLOT(displayMsg(QString,QString)));
-        connect(socClient, SIGNAL(verifyToken(QString)), this, SLOT(verifyChatRoomToken(QString)));
-        connect(socClient, SIGNAL(disconnected()), this, SLOT(chatRoomDisconnected()));
-        connect(socClient, SIGNAL(roomFull()), this, SLOT(chatRoomFull()));
-        connect(socClient, &ChatClient::userJoin, [this](QString user){
-            chatRmUi->addUser(user);
+        // send token to web server to verify
+        connect(socClient, &ChatClient::verifyToken, [this](QString token){
+            qDebug() << "Recieved " << token;
+            //web server to authenticate
+            this->httpsClient.joinChatRoom(this->getUsername(), this->getToken(),
+                                     this->getGroupName(), token);
         });
+        // error
+        connect(socClient, &ChatClient::error, [this](QString errMsg){
+            //quit chat room
+            this->showChatGroup();
+            //display error
+            this->displayMessageBox(errMsg);
+        });
+        // new user connected
+        connect(socClient, &ChatClient::userJoin, [this](QString user){
+            this->chatRmUi->addUser(user);
+        });
+        // connected user quit
         connect(socClient, &ChatClient::userQuit, [this](QString user){
-            chatRmUi->removeUser(user);
+            this->chatRmUi->removeUser(user);
         });
     }
     //set username
     socClient->setUsername(this->username);
 
+    QString IP = ip;
     // if own hosting
     if (socServer){
-        socClient->connectToHost(QHostAddress(QHostAddress::LocalHost).toString());
-    }else{
-        // get ip from somewhere
-        socClient->connectToHost("192.168.1.134");
-        //update if fail to connect
+        IP = QHostAddress(QHostAddress::LocalHost).toString();
     }
-    // delete previous chatroom
+    //only if success than show chat room
+    if (socClient->connectToHost(ip)){
+        //enter chatroom
+        this->showChatRoom();
+    }else{
+        //init chat client shutdown
+        socClient->shut();
+        //display error
+        this->displayMessageBox("Error connecting");
+    }
+}
+
+void Manager::showChatRoom()
+{
+    /*
+     * This function show chat room UI
+     *
+     * Input: Nil
+     * Output: Show new chat room UI
+     */
+    //delete previous chatroom
     if (chatRmUi)
         delete chatRmUi;
-
+    //make new chatRmUi
     chatRmUi = new Chatroom(startWindowUi, username);
     //connect chat room
     connect(chatRmUi, SIGNAL(leaveRoom()), this, SLOT(showChatGroup()));
     connect(chatRmUi, SIGNAL(typeMsg(QString)), this, SLOT(chatRoomSendMsg(QString)));
     //show chat room
     chatRmUi->setModal(true);
-    currentUi = chatRmUi;
-    chatRmUi->show();
+
+    //set currentUi
+    trackUi(chatRmUi);
 }
 
 void Manager::showCreateGroup()
 {
+    /*
+     * This function show create chat group UI
+     *
+     * Input: Nil
+     * Output: Show create chat group UI
+     */
     if(!createGrpUi){
-        //createGrpUi = new CreateGroup(this);
+        //new ui
         createGrpUi = new CreateGroup(startWindowUi);
+        //connect signal
+        // leave creating chat group
         connect(createGrpUi, SIGNAL(cancelCreate()), this, SLOT(showChatGroup()));
-        connect(createGrpUi, SIGNAL(createdGroup()), this, SLOT(hostServer()));
+        // attempt to create chat group
+        connect(createGrpUi, &CreateGroup::createdGroup, [this]
+                (QString groupName, int groupSize, int groupCount, QString ip){
+            //host chat server
+            this->hostServer(groupSize);
+            //update web server
+            this->httpsClient.createChatRoom(this->getUsername(), this->getToken(),
+                                             groupName, groupSize,
+                                             groupCount, ip);
+        });
+        // error
+        connect(createGrpUi, &CreateGroup::errorOccur, [this](QString errMsg){
+            //display error
+            this->displayMessageBox(errMsg);
+        });
         createGrpUi->setModal(true);
     }
-    currentUi = createGrpUi;
-    createGrpUi->show();
+    //set currentUi
+    trackUi(createGrpUi);
 }
 
-void Manager::hostServer()
+void Manager::hostServer(int groupSize)
 {
+    /*
+     * This function attempt to host chat server with specified group size
+     *
+     * Input: int groupSize for limiting number of connected user
+     * Output: Server start listening at PORT
+     */
     //Run server
-    qDebug() << "Running server at port 1234";
-
+    qDebug() << "Running server at port " << PORT;
     socServer = new Server(this);
-    socServer->startServer();
-
-    //show chatroom
-    showChatRoom();
+    //check if unable to start
+    if(socServer->startServer(groupSize)){
+        //set masterkey for token verification
+        socServer->setMasterKey(this->token);
+        //connect signal
+        // update web server count
+        connect(socServer, &Server::updateCount, [this](int count){
+           //web server commmunication
+           this->httpsClient.updateChatRoom(this->getUsername(),
+                                            this->getToken(),QString::number(count));
+        });
+        // error
+        connect(socServer, &Server::error, [this](QString errMsg){
+           //display error
+           this->displayMessageBox(errMsg);
+        });
+    }else{
+        //delete chat server
+        delete socServer;
+        socServer = NULL;
+    }
 }
 
 void Manager::displayMsg(QString sender, QString msg){
     chatRmUi->displayMsg(sender, msg);
-}
-
-void Manager::chatRoomConnected()
-{
-    //clientSocket->write( QByteArray("0") + qPrintable(getUsername()) );
-}
-
-void Manager::chatRoomDisconnected()
-{
-    qDebug() << "Disconnected";
-    // show chat group
-    showChatGroup();
-    // show message box
-    displayMessageBox("Host has quit the chat room.");
 }
 
 void Manager::chatRoomSendMsg(QString msg)
@@ -246,17 +460,3 @@ void Manager::chatRoomSendMsg(QString msg)
         socClient->sendMsg(msg);
     }
 }
-
-void Manager::chatRoomFull(){
-    qDebug() << "Room full";
-    // show chat group
-    showChatGroup();
-    // show message box
-    displayMessageBox("Chat room is full.");
-}
-
-void Manager::verifyChatRoomToken(QString token){
-    qDebug() << "Recieved " << token;
-    httpsClient.chatRoomToken(this->username, this->token, token);
-}
-

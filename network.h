@@ -2,7 +2,7 @@
 #define NETWORK_H
 
 #define PORT 1234
-#define TIMEOUT 15000
+#define TIMEOUT 5000
 
 #include <QObject>
 #include <QDebug>
@@ -77,6 +77,7 @@ enum MESSAGE{
 };
 
 enum ERROR{
+    InvalidSize,
     InvalidToken,
     InvalidSessionNonce,
     InvalidUser,

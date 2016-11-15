@@ -13,11 +13,11 @@
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <widget class="QLabel" name="label">
+  <widget class="QLabel" name="groupNameLabel">
    <property name="geometry">
     <rect>
-     <x>30</x>
-     <y>28</y>
+     <x>40</x>
+     <y>64</y>
      <width>81</width>
      <height>16</height>
     </rect>
@@ -26,24 +26,24 @@
     <string>Group Name:</string>
    </property>
   </widget>
-  <widget class="QLabel" name="label_2">
+  <widget class="QLabel" name="ipLabel">
    <property name="geometry">
     <rect>
-     <x>30</x>
-     <y>84</y>
+     <x>40</x>
+     <y>120</y>
      <width>121</width>
      <height>16</height>
     </rect>
    </property>
    <property name="text">
-    <string>Group Description:</string>
+    <string>IP Address:</string>
    </property>
   </widget>
-  <widget class="QLabel" name="label_3">
+  <widget class="QLabel" name="groupSizeLabel">
    <property name="geometry">
     <rect>
-     <x>30</x>
-     <y>59</y>
+     <x>40</x>
+     <y>90</y>
      <width>71</width>
      <height>16</height>
     </rect>
@@ -55,8 +55,8 @@
   <widget class="QLineEdit" name="groupName">
    <property name="geometry">
     <rect>
-     <x>110</x>
-     <y>24</y>
+     <x>120</x>
+     <y>60</y>
      <width>201</width>
      <height>22</height>
     </rect>
@@ -65,20 +65,10 @@
   <widget class="QLineEdit" name="groupSize">
    <property name="geometry">
     <rect>
-     <x>110</x>
-     <y>54</y>
+     <x>120</x>
+     <y>90</y>
      <width>31</width>
      <height>22</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QPlainTextEdit" name="groupDesc">
-   <property name="geometry">
-    <rect>
-     <x>30</x>
-     <y>104</y>
-     <width>281</width>
-     <height>87</height>
     </rect>
    </property>
   </widget>
@@ -106,6 +96,16 @@
    </property>
    <property name="text">
     <string>&lt;</string>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="ip">
+   <property name="geometry">
+    <rect>
+     <x>120</x>
+     <y>120</y>
+     <width>201</width>
+     <height>22</height>
+    </rect>
    </property>
   </widget>
  </widget>

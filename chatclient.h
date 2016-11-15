@@ -23,12 +23,17 @@ class ChatClient : public QObject
 public:
     explicit ChatClient(QObject *parent = 0);
     ~ChatClient();
-    void shut();
     void init();
+    //setter
     void setUsername(QString username);
-    bool connectToHost(QString ip);
+    void setGroupName(QString groupName);
+    //getter
     const bool& getConnectivity();
     const QString getUsername(int userid);
+    //connection
+    bool connectToHost(QString ip);
+    void shut();
+    //packets
     void rejectPacket(EType e);
     void sendPacket(TType t,QString contents);
     void sendMsg(QString msg);
@@ -38,15 +43,16 @@ private:
     int nonce;
     int ownID;
     QString ownUsername;
+    QString ownGroupName;
     QVector<UserList> userList;
     bool connectionState;
     CryptoPP::SecByteBlock key;
+    QByteArray prevData;
 
 signals:
     void displayMsg(QString sender, QString msg);
     void verifyToken(QString token);
-    void disconnected();
-    void roomFull();
+    void error(QString errormsg);
     void userJoin(QString username);
     void userQuit(QString username);
 

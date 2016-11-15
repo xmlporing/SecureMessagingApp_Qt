@@ -24,8 +24,8 @@ private slots:
     void on_createAccountbtn_clicked();
 
 signals:
-    void goMain();
     void registerAcc(QString username, QString password);
+    void errorOccur(QString warningmsg);
 };
 
 #endif // CREATEACCOUNT_H

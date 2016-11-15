@@ -20,7 +20,9 @@ SOURCES += main.cpp\
     createaccount.cpp \
     server.cpp \
     manager.cpp \
-    sslclient.cpp
+    sslclient.cpp \
+    chatclient.cpp \
+    network.cpp
 
 
 HEADERS  += mainwindow.h \
@@ -32,7 +34,9 @@ HEADERS  += mainwindow.h \
     server.h \
     manager.h \
     sslclient.h \
-    loadingscreen.h
+    loadingscreen.h \
+    chatclient.h \
+    network.h
 
 FORMS    += mainwindow.ui \
     chatgroup.ui \
@@ -42,3 +46,9 @@ FORMS    += mainwindow.ui \
 
 RESOURCES += \
     resource.qrc
+
+CONFIG += c++11
+
+INCLUDEPATH += /Users/chris/Downloads/cryptopp565
+
+LIBS += /Users/chris/Downloads/cryptopp565/libcryptopp.a

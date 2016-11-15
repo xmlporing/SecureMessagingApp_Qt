@@ -6,37 +6,81 @@ Server::Server(QObject *parent) :
 {
     connectedUser = {};
     currentId = 1;
+    maxCount = 0;
 }
 
 Server::~Server()
 {
-    //clear QVector
-    connectedUser.clear();
-    Q_ASSERT (connectedUser.size() == 0);
+    closeServer();
     qDebug() << "Closing server";
 }
 
-// Function
-void Server::startServer()
+// ******* Public Function *******
+bool Server::startServer(int maxUserCount)
 {
+    /*
+     * This function attempt to listen at PORT with specified group size
+     *
+     * Input: int groupSize for limiting number of connected user
+     * Output:
+     *      1) True: Server start listening at PORT
+     *      2) False: Server failed to listen
+     */
     if(!this->listen(QHostAddress::Any,PORT))
     {
         qDebug() << "Could not start server";
-        // timeout of chat group
+        emit error("Unable to host at " + QString::number(PORT));
+        // display some error and return to chatgroupui
+        return false;
     }
+    if (maxUserCount <= 1){
+        qDebug() << "User set too low max user count.";
+        emit error("Maximum user size are too small.");
+        return false;
+    }
+    //set maxCount
+    this->maxCount = maxUserCount;
+    //success
+    return true;
 }
 
 void Server::closeServer()
 {
-    //removing all connectedUser
-    for (int i = 0; i < connectedUser.size(); i++){
+    /*
+     * This function will close chat server and remove all allocated objects
+     *
+     * Input: Nil
+     * Output: Nil
+     */
+    //close this server to prevent more incoming connections
+    this->close();
+    //clearing
+    int i = 0;
+    //sending "host quit" to all verified and connected user
+    for (; i < connectedUser.size(); i++){
+        if (connectedUser.at(i)->verified)
+            sendPacket(connectedUser.at(i), PROTOCOL_TYPE::HostQuit, QString::number(connectedUser.at(i)->nonce));
+    }
+    //removing all object
+    for (i = 0; i < connectedUser.size(); i++){
         delete connectedUser[i];
     }
-    //close this server
-    this->close();
+    //clear QVector
+    connectedUser.clear();
 }
 
 void Server::rejectPacket(const whiteListObj* wlObj, EType error){
+    /*
+     * This function will send a reject packet of specified type to destinated user
+     *
+     * Input:
+     *      1) const whiteListObj* wlObj -> connected user
+     *      2) EType error -> error message code as per network.h
+     * Output: Nil
+     */
+    // check for valid socket
+    if(!wlObj->socket)
+        return;
     // send PROTOCOL_TYPE::Reject with fixed 1 byte length
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
@@ -47,12 +91,26 @@ void Server::rejectPacket(const whiteListObj* wlObj, EType error){
            << EType(error);
 
     wlObj->socket->write(data, PROTOCOL::HeaderSize + PROTOCOL::ErrorSize);
+    //flush the socket
+    wlObj->socket->flush();
 }
 
 void Server::sendPacket(const whiteListObj* wlObj, TType t, QString contents)
 {
-    qDebug() << "Server::sendPacket -> Sending " << contents;
-    // send packet base on t
+    /*
+     * This function will send a packet of specified type and related contents
+     * to destinated user
+     *
+     * Input:
+     *      1) const whiteListObj* wlObj -> connected user
+     *      2) TType t -> type message code as per network.h
+     *      3) QString contents -> plaintext that will be converted to encrypted msg
+     * Output: Nil
+     */
+    // check for valid socket
+    if(!wlObj->socket)
+        return;
+    // send packet base on PROTOCOL_TYPE t
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
     stream.setVersion(DATASTREAMVER);
@@ -73,7 +131,35 @@ void Server::sendPacket(const whiteListObj* wlObj, TType t, QString contents)
     wlObj->socket->write(data, PROTOCOL::HeaderSize + totalsize);
 }
 
+void Server::setMasterKey(QString key){
+    /*
+     * This function will attempt to set the master key
+     *
+     * Input: QString key -> key that is base64 encoded
+     * Output: Nil unless there is error setting the key
+     */
+    if (!Custom::setKey(this->masterKey, key))
+        emit error("There is some problem with the login, please logout and try again later.");
+}
+
+// ******* Private function *******
+
 void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
+    /*
+     * This function will process incoming data from connected user(s).
+     * It validates the packet length with header, and determining on
+     * the type of packet recieved and/or decrypt message content,
+     * it could be:
+     * 1) Forward to every verified user
+     * 2) Reply with corresponding packets
+     * 3) Reply with reject packet
+     * 4) Completely ignore illegal packet
+     *
+     * Input:
+     *      1) QByteArray data -> data that has been sent by connected user
+     *      2) const whiteListObj* wlObj -> connected user
+     * Output: Nil
+     */
     // Debug
     qDebug() << "Server::processIncomingData -> Data size: " << data.size();
     // check if data is smaller than expected
@@ -99,6 +185,7 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
                  << dType
                  << " , Raw Data: "
                  << data;
+        rejectPacket(wlObj,ERROR::InvalidSize);
         return;
     }
 
@@ -110,7 +197,11 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             QString token = generateToken();
             // set to wlObj
             wlObj->token = token;
-            // send raw packet
+            // sending raw packet
+            // check for valid socket
+            if(!wlObj->socket)
+                break;
+            // // send PROTOCOL_TYPE::TokenVerify with fixed size token
             QByteArray data;
             QDataStream stream(&data, QIODevice::WriteOnly);
             stream.setVersion(DATASTREAMVER);
@@ -134,6 +225,7 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
         dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
         //decrypt
         QString text = Custom::decrypt(this->masterKey, iv, ciphertext);
+        //convert to qbytearray
         QByteArray contents = text.toLocal8Bit();
         //token from byte 0 to 15
         QString sendToken = QString::fromLocal8Bit(contents.mid(0,PROTOCOL::TokenSize));
@@ -143,14 +235,15 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             //key from byte 16 to dLength
             if (!Custom::setKey( wlObj->key,
                                 QString::fromLocal8Bit(contents.mid(PROTOCOL::TokenSize,
-                                                                    dLength)
+                                                                    dLength - PROTOCOL::TokenSize)
                                                        )
                                 )
                 )
                 rejectPacket(wlObj, ERROR::InvalidToken);
             else{
-                //send nonce
+                //generate nonce
                 wlObj->nonce = generateNonce();
+                //send nonce and allocated id
                 sendPacket(wlObj, PROTOCOL_TYPE::SendNonce, QString::number(wlObj->nonce) + DELIMITER + QString::number(wlObj->userId));
             }
         }
@@ -174,8 +267,10 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
         //send each one in chatgroup
         int maxSize = connectedUser.size();
         for (int i = 0; i< maxSize; i++){
-            if (connectedUser[i]->verified && connectedUser[i]->userId != wlObj->userId)
-                sendPacket(wlObj, PROTOCOL_TYPE::ClientJoin,QString::number(connectedUser[i]->userId) + DELIMITER + connectedUser[i]->userName);
+            if (!connectedUser.at(i))
+                continue;
+            if (connectedUser.at(i)->verified && connectedUser.at(i)->userId != wlObj->userId)
+                sendPacket(wlObj, PROTOCOL_TYPE::ClientJoin,QString::number(connectedUser.at(i)->userId) + DELIMITER + connectedUser.at(i)->userName);
         }
         break;
     }
@@ -216,9 +311,12 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             break;
         if (userid == wlObj->userId){
             int currentCount = connectedUser.size();
+            //change verified flag and disconnect
             wlObj->verified = false;
             wlObj->socket->disconnectFromHost();
+            //signal
             emit updateCount(currentCount - 1);
+            //update all when client quit
             sendToAll(text, PROTOCOL_TYPE::ClientQuit);
         }
         break;
@@ -249,31 +347,15 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
     }
 }
 
-QByteArray Server::convertedData(const QByteArray &data){
-    if (data.size() <= 1) //***
-        return QByteArray();
-    QByteArray sendData;
-    // raw numbers will be converted to enum
-    switch ((int)data[0]){
-    case 0: //connected
-        sendData.append(data.mid(1));
-        sendData.append(QString(" connected"));
-        break;
-    case 1: //disconnected
-        sendData.append(data.mid(1));
-        sendData.append(QString(" disconnected"));
-        break;
-    case 2: //send msg
-        sendData.append(data.mid(1));
-        sendData.append(QString(" disconnected"));
-        break;
-    default: //send whole chunk
-        return data;
-    }
-    return sendData;
-}
-
 bool Server::compareIP(const QHostAddress& ip){
+    /*
+     * This function will compare if it is locally connected
+     *
+     * Input: const QHostAddress& ip -> ip of connected user
+     * Output:
+     *      1) True: local ip
+     *      2) False: non-local ip
+     */
     qDebug() << ip.toString();
     if (QHostAddress(ip.toIPv4Address()) == QHostAddress(QHostAddress::LocalHost))
         return true;
@@ -281,6 +363,12 @@ bool Server::compareIP(const QHostAddress& ip){
 }
 
 QString Server::generateToken(){
+    /*
+     * This function will generate 16 char long random string
+     *
+     * Input: Nil
+     * Output: 16 char of hex encoded string
+     */
     //generate 8 bytes of random as hex will twice the presentation
     byte token[ PROTOCOL::TokenSize / 2];
     CryptoPP::AutoSeededRandomPool prng;
@@ -291,6 +379,12 @@ QString Server::generateToken(){
 }
 
 int Server::generateNonce(){
+    /*
+     * This function will generate 32bit random number
+     *
+     * Input: Nil
+     * Output: 32bit number store in int
+     */
     //generate 4 bytes of random
     byte nonce[ PROTOCOL::NonceSize ];
     CryptoPP::AutoSeededRandomPool prng;
@@ -306,11 +400,46 @@ int Server::generateNonce(){
 // Slots
 void Server::incomingConnection(qintptr socketDescriptor)
 {
+    /*
+     * This function will recieve all incoming connection
+     * and do connected user check before adding to whitelist
+     *
+     * Input: qintptr socketDescriptor -> to open a socket
+     * Output: 16 char of hex encoded string
+     */
     // We have a new connection
     qDebug() << socketDescriptor << " Connecting...";
 
+    // check for over hitting of maxCount
+    if (connectedUser.size() + 1 > maxCount){
+        //try to detect and remove disconnected user
+        for(int i = 0; i < connectedUser.size();){
+            if (connectedUser.at(i)->socket->state() == QTcpSocket::UnconnectedState){
+                qDebug() << "Removing disconnected user, " << connectedUser.at(i)->userId;
+                delete connectedUser[i];
+                connectedUser.remove(i);
+            }else{
+                i++;
+            }
+        }
+        //check if still above count
+        if (connectedUser.size() + 1 > maxCount){
+            qDebug() << "Dropping connection by writing ERROR::ROOMFULL";
+            //sending room full packet
+            QTcpSocket * client = new QTcpSocket();
+            client->setSocketDescriptor(socketDescriptor);
+            whiteListObj * whitelistStruct = new whiteListObj(client->peerAddress().toString(),
+                                                              this->currentId++,
+                                                              client,
+                                                              false);
+            rejectPacket(whitelistStruct, ERROR::RoomFull);
+            delete whitelistStruct;
+            return;
+        }
+    }
+
     //add into whitelist, generate nonce, store IP, username and userID
-    QTcpSocket * client = new QTcpSocket(this); //auto delete
+    QTcpSocket * client = new QTcpSocket();
     client->setSocketDescriptor(socketDescriptor);
 
     bool verify = compareIP(client->peerAddress());
@@ -324,21 +453,25 @@ void Server::incomingConnection(qintptr socketDescriptor)
         whitelistStruct->nonce = generateNonce();
         sendPacket(whitelistStruct, PROTOCOL_TYPE::SendNonce, QString::number(whitelistStruct->nonce) + DELIMITER + QString::number(whitelistStruct->userId));
     }
-    //append to connectedUser
+    //append to connectedUser aka whitelist
     connectedUser.append(whitelistStruct);
 
     //connect signal
+    // packet in socket
     connect(client, &QTcpSocket::readyRead, [this,whitelistStruct]()
     {
+        //hold all available bytes from packet
         QByteArray data = whitelistStruct->socket->readAll();
         //decrypt data at here, send unencrypted form, check data
         processIncomingData(data, whitelistStruct);
     });
+    // user disconnected
     connect(client, &QTcpSocket::disconnected, [this,whitelistStruct]()
     {
-        whitelistStruct->socket->abort();
+        //notify all if verified user leave
         if (whitelistStruct->verified)
             sendToAll(QString::number(whitelistStruct->userId),PROTOCOL_TYPE::ClientQuit);
+        //this connection is no longer verified
         whitelistStruct->verified = false;
     });
 
@@ -346,16 +479,24 @@ void Server::incomingConnection(qintptr socketDescriptor)
 
 void Server::sendToAll(QString data, TType t)
 {
+    /*
+     * This function will send plaintext data to all verified user
+     * of type t
+     *
+     * Input:
+     *      1) QString data -> plaintext to be forwarded to all
+     *      2) TType t -> type of data to be forwarded
+     * Output: encrypted packets with individual session key
+     */
     int i = 0;
-    int maxSize = connectedUser.size();
     qDebug() << "Server::sendToAll -> Sending to all with " << data;
-    qDebug () << maxSize << " , " << i;
     //sending to all connected user;
-    for (;i< maxSize; i++){
-        if (connectedUser[i] && connectedUser[i]->socket){
-            if (connectedUser[i]->verified && connectedUser[i]->socket->state() == QAbstractSocket::ConnectedState){
-                qDebug() << "Connected user : " << i;
-                sendPacket(connectedUser[i], t, data);
+    for (;i< connectedUser.size(); i++){
+        // valid ptr and has been verified to recieve msg
+        if (connectedUser.at(i) && connectedUser.at(i)->verified){
+            // valid connected socket
+            if ( connectedUser.at(i)->socket && connectedUser.at(i)->socket->state() == QAbstractSocket::ConnectedState){
+                sendPacket(connectedUser.at(i), t, data);
             }
         }
     }

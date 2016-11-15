@@ -5,10 +5,6 @@
 #include <QDateTime>
 #include <QDebug>
 
-// Resources link
-/*
- * Temp dump
- * Loading screen: http://www.ajaxload.info/#preview
- */
+#define MAX_INPUT_CHAR 255
 
 #endif // LIBRARY_H

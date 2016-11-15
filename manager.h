@@ -2,7 +2,6 @@
 #define MANAGER_H
 
 #include <QObject>
-#include <QTcpSocket>
 #include <QMessageBox>
 #include "mainwindow.h"
 #include "createaccount.h"
@@ -27,51 +26,38 @@ public:
     ~Manager();
 
 private:
-    //pages
+    //UI / pages
     MainWindow *startWindowUi;
     CreateAccount *createAccUi;
     Chatgroup *chatGrpUi;
     Chatroom *chatRmUi;
     CreateGroup *createGrpUi;
+    //track ui
     QWidget* currentUi;
+    void trackUi(QWidget* newUi);
     //user data
     QString username;
     QString token;
-    //server
+    QString groupName;
+    //chat server
     Server *socServer;
     ChatClient *socClient;
     //HTTPS client
     SSLClient httpsClient;
-    //Warn Dialog
+    //warning dialog
     LoadingScreen * loadScreen;
-    void loadWaitScreen(bool run){
-        if (run){
-            loadScreen->show();
-            loadScreen->startLoading();
-            timer->start(LTIMEOUT);
-        }else{
-            if (timer->isActive())
-                timer->stop();
-            loadScreen->hide();
-            loadScreen->stopLoading();
-        }
-    }
+    void loadWaitScreen(bool run);
     //timer
     QTimer *timer;
-    //setter, changing to struct
-    void setUsername(QString user){
-        this->username = user;
-    }
-    const QString &getUsername(){
-        return this->username;
-    }
-    void setToken(const QString &token){
-        this->token = token;
-    }
-    const QString &getToken(){
-        return this->token;
-    }
-    //Messagebox
+    //setter
+    void setUsername(QString user);
+    void setToken(QString token);
+    void setGroupName(QString groupName);
+    //getter
+    const QString &getUsername();
+    const QString &getToken();
+    const QString &getGroupName();
+    //message box
     void displayMessageBox(QString msg);
 
 signals:
@@ -80,17 +66,13 @@ public slots:
     void login(QString username, QString pass);
     void successfulLogin(const QString &username, const QString &token);
     void registerAcc();
-    void showMain();
     void showChatGroup();
+    void connectToChatRoom(QString ip);
     void showChatRoom();
     void showCreateGroup();
-    void hostServer();
+    void hostServer(int groupSize);
     void displayMsg(QString user, QString msg);
-    void chatRoomConnected();
-    void chatRoomDisconnected();
     void chatRoomSendMsg(QString msg);
-    void chatRoomFull();
-    void verifyChatRoomToken(QString token);
 };
 
 #endif // MANAGER_H
