@@ -284,6 +284,7 @@ void SSLClient::recieveChatGroupList(){
             for (const QJsonValue& chatGroup : chatGroupsArray){
                 // convert to QJsonObject
                 QJsonObject loopObj = chatGroup.toObject();
+                qDebug() << loopObj;
                 // emit one by one
                 if (loopObj["groupName"].isString() &&
                         loopObj["groupSize"].isDouble() &&
@@ -319,6 +320,7 @@ void SSLClient::recieveCreateChatRoom(){
     QJsonValue success = QJsonObject(itemDoc.object())["response"];
     QJsonValue responseMsg = QJsonObject(itemDoc.object())["responseMessage"];
     if ((success.isString() && success.toString() == "success") || true){
+        qDebug() << "Successfully created chat room : " << responseMsg;
         emit createChatRoomSuccess();
     }else
     // handle non string error or no "token" key error
