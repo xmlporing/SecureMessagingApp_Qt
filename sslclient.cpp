@@ -15,7 +15,6 @@ SSLClient::SSLClient(QObject *parent) : QObject(parent)
     // read from config file
     QSettings settings("config.ini",QSettings::IniFormat);
     qDebug() << settings.fileName();
-    settings.setValue("server", "https://changetoyourdomain.com");
     baseURL = settings.value("server", "").toString();
     if (baseURL == ""){
         settings.setValue("server", "https://changetoyourdomain.com");
