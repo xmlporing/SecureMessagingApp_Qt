@@ -85,32 +85,6 @@
     <string>+</string>
    </property>
   </widget>
-  <widget class="QLabel" name="dateTimeLbl">
-   <property name="geometry">
-    <rect>
-     <x>30</x>
-     <y>310</y>
-     <width>141</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Last Login Date &amp; Time:</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="dateTimeHere">
-   <property name="geometry">
-    <rect>
-     <x>170</x>
-     <y>310</y>
-     <width>211</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>datehere</string>
-   </property>
-  </widget>
   <widget class="QPushButton" name="refreshButton">
    <property name="geometry">
     <rect>

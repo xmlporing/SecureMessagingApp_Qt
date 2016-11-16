@@ -147,3 +147,13 @@ bool Custom::setKey(CryptoPP::SecByteBlock& secretKey, QString stringKey){
     }
     return true;
 }
+
+void Custom::nonceIncrement(int &nonce){
+    //check if overflow
+    if (nonce == std::numeric_limits<int>::max() - 1){
+        nonce = std::numeric_limits<int>::min();
+    }else{
+        //increase nonce
+        nonce++;
+    }
+}

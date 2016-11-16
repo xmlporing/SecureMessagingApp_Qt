@@ -43,10 +43,13 @@ class Server : public QTcpServer
 public:
     explicit Server(QObject *parent = 0);
     ~Server();
+    //connection
     bool startServer(int maxUserCount);
     void closeServer();
+    //packet
     void rejectPacket(const whiteListObj* wlObj, EType error);
-    void sendPacket(const whiteListObj* wlObj, TType t, QString contents);
+    void sendPacket(whiteListObj* wlObj, TType t, QString contents);
+    //key
     void setMasterKey(QString key);
 
 private:
@@ -54,6 +57,7 @@ private:
     int currentId;
     int maxCount;
     CryptoPP::SecByteBlock masterKey;
+
     void processIncomingData(QByteArray data, whiteListObj* wlObj);
     bool compareIP(const QHostAddress & ip);
     QString generateToken();
@@ -67,6 +71,7 @@ public slots:
     void sendToAll(QString data, TType t = PROTOCOL_TYPE::Message);
 
 protected:
+    //base function
     void incomingConnection(qintptr socketDescriptor);    
 
 };

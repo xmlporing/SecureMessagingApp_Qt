@@ -62,8 +62,6 @@ Manager::Manager(QObject *parent) : QObject(parent)
         if (this->socServer){
             //ip will be converted to local
             this->connectToChatRoom("");
-            //show chatroom
-            this->showChatRoom();
         }
     });
     // successful chat room token recieved
@@ -347,7 +345,7 @@ void Manager::connectToChatRoom(QString ip)
         IP = QHostAddress(QHostAddress::LocalHost).toString();
     }
     //only if success than show chat room
-    if (socClient->connectToHost(ip)){
+    if (socClient->connectToHost(IP)){
         //enter chatroom
         this->showChatRoom();
     }else{
@@ -373,7 +371,16 @@ void Manager::showChatRoom()
     chatRmUi = new Chatroom(startWindowUi, username);
     //connect chat room
     connect(chatRmUi, SIGNAL(leaveRoom()), this, SLOT(showChatGroup()));
-    connect(chatRmUi, SIGNAL(typeMsg(QString)), this, SLOT(chatRoomSendMsg(QString)));
+    // sending msg to host
+    connect(chatRmUi, &Chatroom::typeMsg, [this](QString msg){
+        if (this->socClient){
+            this->socClient->sendMsg(msg);
+        }
+    });
+    // invalid user inputs
+    connect(chatRmUi, &Chatroom::errorOccur, [this](QString errMsg){
+       this->displayMessageBox(errMsg);
+    });
     //show chat room
     chatRmUi->setModal(true);
 
@@ -452,11 +459,4 @@ void Manager::hostServer(int groupSize)
 
 void Manager::displayMsg(QString sender, QString msg){
     chatRmUi->displayMsg(sender, msg);
-}
-
-void Manager::chatRoomSendMsg(QString msg)
-{
-    if (socClient){
-        socClient->sendMsg(msg);
-    }
 }

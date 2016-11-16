@@ -31,6 +31,7 @@ private:
     QNetworkReply * reply;
     QList<QSslError> expectedSslErrors;
     QString baseURL;
+    bool debugging;
 
 signals:
     void errorOccur(QString errorMsg);

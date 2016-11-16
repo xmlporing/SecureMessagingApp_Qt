@@ -23,10 +23,10 @@
  * Init             -> HEADER
  * TokenVerify      -> HEADER | token(16)
  * ServerVerify     -> HEADER | IV(16) | E(token(16)|session_key(base64))
- * SendNonce        -> HEADER | IV(16) | E(session_nonce,id)
+ * SendNonce        -> HEADER | IV(16) | E("session_nonce,id,")
  * UserDetails      -> HEADER | IV(16) | E(username)
- * Message          -> HEADER | IV(16) | E("userid,msg")
- * ClientJoin       -> HEADER | IV(16) | E("userid,username")
+ * Message          -> HEADER | IV(16) | E("session_nonce,userid,msg")
+ * ClientJoin       -> HEADER | IV(16) | E(",userid,username")
  * ClientQuit       -> HEADER | IV(16) | E(userid)
  * HostQuit         -> HEADER | IV(16) | E(session_nonce)
  * Reject           -> HEADER | Error_code(8)
@@ -68,12 +68,13 @@ enum PROTOCOL_TYPE {
     ForceSize = 0xFFFF, //Do not use, used to ensure is 2 bytes
 };
 
-//Message protocol, (userid,value), have delimiter char of ","
+//Message protocol, (nonce,userid,value), have delimiter char of ","
 #define DELIMITER ","
 enum MESSAGE{
-    Section = 2,
-    UserId = 0,
-    MsgValue = 1,
+    Section = 3,
+    Nonce = 0,
+    UserId = 1,
+    MsgValue = 2,
 };
 
 enum ERROR{
@@ -94,6 +95,7 @@ namespace Custom{
     QString decrypt(QString secretKey, QString IV, QString cipherText);
     QByteArray encrypt(CryptoPP::SecByteBlock secretKey, QByteArray& IV, QString plaintext);
     bool setKey(CryptoPP::SecByteBlock& secretKey, QString stringKey);
+    void nonceIncrement(int& nonce);
 }
 
 

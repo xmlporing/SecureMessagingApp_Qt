@@ -8,9 +8,6 @@ Chatgroup::Chatgroup(QWidget *parent) :
 {
     //default setup ui
     ui->setupUi(this);
-    //set time login
-    QDateTime datetime = QDateTime::currentDateTime();
-    ui->dateTimeHere->setText(datetime.toString());
     //set single selection
     ui->listChatgroup->setSelectionMode(QAbstractItemView::SingleSelection);
 }

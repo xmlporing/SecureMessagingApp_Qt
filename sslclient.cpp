@@ -13,11 +13,17 @@ SSLClient::SSLClient(QObject *parent) : QObject(parent)
     expectedSslErrors.append(QSslError(QSslError::CertificateUntrusted ,cert.at(0)));
 
     // read from config file
-    QSettings settings("config.ini",QSettings::QSettings::IniFormat);
+    QSettings settings("config.ini",QSettings::IniFormat);
     qDebug() << settings.fileName();
+    settings.setValue("server", "https://changetoyourdomain.com");
     baseURL = settings.value("server", "").toString();
-    if (baseURL == "")
+    if (baseURL == ""){
         settings.setValue("server", "https://changetoyourdomain.com");
+        baseURL = settings.value("server", "").toString();
+    }
+
+    //debugging 1) locally(true) 2) network(false)
+    debugging = true;
 }
 
 void SSLClient::registerAcc(const QString &username, const QString &password)
@@ -208,6 +214,10 @@ void SSLClient::recieveRegistration(){
 }
 
 void SSLClient::recieveLoginToken(const QString &username){
+    if (debugging){
+        emit returnLoginToken(username, "testingtoken");
+        return;
+    }
     if (reply->error() != QNetworkReply::NoError){
         qDebug() << reply->errorString();
         emit errorOccur("Error reaching server");
@@ -229,6 +239,10 @@ void SSLClient::recieveLoginToken(const QString &username){
 }
 
 void SSLClient::recieveLogout(){
+    if (debugging){
+        emit logoutSuccess();
+        return;
+    }
     if (reply->error() != QNetworkReply::NoError){
         qDebug() << reply->errorString();
         emit errorOccur("Error reaching server");
@@ -247,6 +261,17 @@ void SSLClient::recieveLogout(){
 }
 
 void SSLClient::recieveChatGroupList(){
+    if (debugging){
+        emit newChatGroupList("GroupName1",
+                10,
+                3,
+                "192.1.1.1");
+        emit newChatGroupList("GroupName2",
+                2,
+                1,
+                "192.1.1.2");
+        return;
+    }
     // sample return value {"token":"<some token value>"}
     QJsonDocument itemDoc = QJsonDocument::fromJson(reply->readAll());
     QJsonValue success = QJsonObject(itemDoc.object())["response"];
@@ -281,6 +306,10 @@ void SSLClient::recieveChatGroupList(){
 }
 
 void SSLClient::recieveCreateChatRoom(){
+    if (debugging){
+        emit createChatRoomSuccess();
+        return;
+    }
     if (reply->error() != QNetworkReply::NoError){
         qDebug() << reply->errorString();
         emit errorOccur("Error reaching server");
@@ -323,6 +352,10 @@ void SSLClient::recieveJoinChatRoom(){
 }
 
 void SSLClient::recieveUpdateChatRoom(){
+    if (debugging){
+        emit updateChatRoomSuccess();
+        return;
+    }
     if (reply->error() != QNetworkReply::NoError){
         qDebug() << reply->errorString();
         emit errorOccur("Error reaching server");
@@ -340,6 +373,10 @@ void SSLClient::recieveUpdateChatRoom(){
 }
 
 void SSLClient::recieveDelChatRoom(){
+    if (debugging){
+        emit delChatRoomSuccess();
+        return;
+    }
     if (reply->error() != QNetworkReply::NoError){
         qDebug() << reply->errorString();
         emit errorOccur("Error reaching server");

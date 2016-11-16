@@ -95,7 +95,7 @@ void Server::rejectPacket(const whiteListObj* wlObj, EType error){
     wlObj->socket->flush();
 }
 
-void Server::sendPacket(const whiteListObj* wlObj, TType t, QString contents)
+void Server::sendPacket(whiteListObj* wlObj, TType t, QString contents)
 {
     /*
      * This function will send a packet of specified type and related contents
@@ -110,6 +110,13 @@ void Server::sendPacket(const whiteListObj* wlObj, TType t, QString contents)
     // check for valid socket
     if(!wlObj->socket)
         return;
+    // check if type is message
+    if (t == PROTOCOL_TYPE::Message){
+        //increase nonce
+        Custom::nonceIncrement(wlObj->nonce);
+        //adding nonce to message
+        contents = QString("%1,%2").arg(QString::number(wlObj->nonce),contents);
+    }
     // send packet base on PROTOCOL_TYPE t
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
@@ -232,15 +239,11 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
         if (sendToken == wlObj->token){
             //if same set, session key
             qDebug() << "Same";
+            QString obtainedKey = QString::fromLocal8Bit(contents.mid(PROTOCOL::TokenSize,dLength - PROTOCOL::TokenSize));
             //key from byte 16 to dLength
-            if (!Custom::setKey( wlObj->key,
-                                QString::fromLocal8Bit(contents.mid(PROTOCOL::TokenSize,
-                                                                    dLength - PROTOCOL::TokenSize)
-                                                       )
-                                )
-                )
+            if (!Custom::setKey( wlObj->key,obtainedKey)){
                 rejectPacket(wlObj, ERROR::InvalidToken);
-            else{
+            }else{
                 //generate nonce
                 wlObj->nonce = generateNonce();
                 //send nonce and allocated id
@@ -262,16 +265,7 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
         //decrypt
         QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
         //send to all clientJoin
-        qDebug() << "Sending to all client to join by USERDetails";
-        sendToAll(QString::number(wlObj->userId) + DELIMITER + text, PROTOCOL_TYPE::ClientJoin);
-        //send each one in chatgroup
-        int maxSize = connectedUser.size();
-        for (int i = 0; i< maxSize; i++){
-            if (!connectedUser.at(i))
-                continue;
-            if (connectedUser.at(i)->verified && connectedUser.at(i)->userId != wlObj->userId)
-                sendPacket(wlObj, PROTOCOL_TYPE::ClientJoin,QString::number(connectedUser.at(i)->userId) + DELIMITER + connectedUser.at(i)->userName);
-        }
+        sendToAll(DELIMITER + QString::number(wlObj->userId) + DELIMITER + text, PROTOCOL_TYPE::ClientJoin);
         break;
     }
     case PROTOCOL_TYPE::Message:
@@ -288,7 +282,44 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
             //decrypt
             QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
-            sendToAll(text);
+            qDebug()<< "Recieved decrypted text: " << text;
+            //split by DELIMITER
+            QStringList pieces = text.split(DELIMITER);
+            if (pieces.size() >= MESSAGE::Section){
+                qDebug() << pieces;
+                //convert to int (nonce)
+                QString textNonce = pieces[MESSAGE::Nonce];
+                bool convertOk;
+                int nonce = textNonce.toInt(&convertOk);
+                if (!convertOk)
+                    break;
+                //check if correct nonce
+                if (nonce != wlObj->nonce + 1){
+                    qDebug() << "Sent nonce is "
+                             << nonce
+                             << " , my nonce is "
+                             << wlObj->nonce;
+                }
+                //increase nonce
+                Custom::nonceIncrement(wlObj->nonce);
+
+                //convert to int(UserId)
+                QString textUserid = pieces[MESSAGE::UserId];
+                //convert to int
+                textUserid.toInt(&convertOk);
+                if (!convertOk)
+                    break;
+
+                //remove nonce from msg
+                pieces.removeFirst();
+                //remove userId from msg
+                pieces.removeFirst();
+
+                //msg sent by user
+                QString msg = pieces.join("");
+                //send to all
+                sendToAll(textUserid + DELIMITER + msg);
+            }
         }
         break;
     }
@@ -449,9 +480,10 @@ void Server::incomingConnection(qintptr socketDescriptor)
                                                       client,
                                                       verify);
     if (verify){ //own client, skip server verification
+        qDebug() << "Own client sending nonce now";
         //send nonce
         whitelistStruct->nonce = generateNonce();
-        sendPacket(whitelistStruct, PROTOCOL_TYPE::SendNonce, QString::number(whitelistStruct->nonce) + DELIMITER + QString::number(whitelistStruct->userId));
+        sendPacket(whitelistStruct, PROTOCOL_TYPE::SendNonce, QString::number(whitelistStruct->nonce) + DELIMITER + QString::number(whitelistStruct->userId) + DELIMITER);
     }
     //append to connectedUser aka whitelist
     connectedUser.append(whitelistStruct);
@@ -480,13 +512,13 @@ void Server::incomingConnection(qintptr socketDescriptor)
 void Server::sendToAll(QString data, TType t)
 {
     /*
-     * This function will send plaintext data to all verified user
-     * of type t
+     * This function will encrypt plaintext with data to
+     * all verified user of type t
      *
      * Input:
      *      1) QString data -> plaintext to be forwarded to all
      *      2) TType t -> type of data to be forwarded
-     * Output: encrypted packets with individual session key
+     * Output: Nil
      */
     int i = 0;
     qDebug() << "Server::sendToAll -> Sending to all with " << data;

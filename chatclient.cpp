@@ -11,6 +11,12 @@ ChatClient::~ChatClient(){
 }
 
 void ChatClient::init(){
+    /*
+     * This function will reset all data
+     *
+     * Input: Nil
+     * Output: Nil
+     */
     this->nonce = 0;
     this->ownID = 0;
     this->ownUsername = "";
@@ -47,6 +53,15 @@ const QString ChatClient::getUsername(int userid){
 //connection
 bool ChatClient::connectToHost(QString ip)
 {
+    /*
+     * This function will attempt to connect to specific IP.
+     * If there is no valid socket, it will be created
+     *
+     * Input: QString ip -> what is the ip client gonna connect to
+     * Output:
+     *      1) True: successfully connected
+     *      2) False: unsuccessfully in connecting
+     */
     // check for valid socket
     if (!clientSoc){
         this->clientSoc = new QTcpSocket(this);
@@ -67,6 +82,13 @@ bool ChatClient::connectToHost(QString ip)
 }
 
 void ChatClient::shut(){
+    /*
+     * This function will clear all session data and shut
+     * down connected socket
+     *
+     * Input: Nil
+     * Output: Nil
+     */
     init();
     clientSoc->abort();
     clientSoc->deleteLater(); //auto delete
@@ -75,6 +97,13 @@ void ChatClient::shut(){
 
 //packet
 void ChatClient::rejectPacket(EType error){
+    /*
+     * This function will attempt to send a reject
+     * packet with type of error
+     *
+     * Input: EType error -> type of error for rejecting
+     * Output: Nil
+     */
     // send PROTOCOL_TYPE::Reject with fixed 1 byte length
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
@@ -83,11 +112,29 @@ void ChatClient::rejectPacket(EType error){
     stream << TType(PROTOCOL_TYPE::Reject)
            << LType(PROTOCOL::ErrorSize)
            << EType(error);
+
     if (this->clientSoc)
         this->clientSoc->write(data, PROTOCOL::HeaderSize + PROTOCOL::ErrorSize);
 }
 
 void ChatClient::sendPacket(TType t, QString contents){
+    /*
+     * This function will attempt to send a packet of type t
+     * with encrypted contents.
+     * If packet is type message, add nonce
+     *
+     * Input:
+     *      1) TType t -> type of packet
+     *      2) QString contents -> plaintext
+     * Output: Nil
+     */
+    // check if type is message
+    if (t == PROTOCOL_TYPE::Message){
+        //increase nonce
+        Custom::nonceIncrement(this->nonce);
+        //adding nonce to message
+        contents = QString("%1,%2").arg(QString::number(this->nonce),contents);
+    }
     // send packet base on t
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
@@ -102,14 +149,12 @@ void ChatClient::sendPacket(TType t, QString contents){
 
     // forming packet
     stream << TType(t)
-           << LType(iv.size() + ciphertext.size());
+           << LType(totalsize);
     stream.writeRawData(iv.data(), iv.size());
     stream.writeRawData(ciphertext.data(), ciphertext.size());
 
     if (this->clientSoc)
         this->clientSoc->write(data, PROTOCOL::HeaderSize + totalsize);
-    //save for resend
-    prevData = QByteArray(data);
 }
 
 void ChatClient::sendMsg(QString msg){
@@ -120,6 +165,19 @@ void ChatClient::sendMsg(QString msg){
 // slots
 void ChatClient::readPacket()
 {
+    /*
+     * This function will process incoming data from host.
+     * It validates the packet length with header, and determining on
+     * the type of packet recieved and/or decrypt message content,
+     * it could be:
+     * 1) Displaying msg to UI
+     * 2) Reply with corresponding packets
+     * 3) Reply with reject packet
+     * 4) Completely ignore illegal packet
+     *
+     * Input: Nil
+     * Output: Nil
+     */
     if (!clientSoc)
         return;
     // read all data in packet
@@ -170,17 +228,20 @@ void ChatClient::readPacket()
         dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
         //decrypt
         QString text = Custom::decrypt(this->key, iv, ciphertext);
+        //split by DELIMITER
         QStringList pieces = text.split(DELIMITER);
+        qDebug() << "Recieved nonce " << text;
         if (pieces.size() == MESSAGE::Section){
-            QString nonce = pieces[MESSAGE::UserId];
+            QString nonce = pieces[MESSAGE::Nonce];
             //set nonce
             bool convertOk;
             this->nonce = nonce.toInt(&convertOk); //default to 0 if fail
-            QString id = pieces[MESSAGE::MsgValue];
+            QString id = pieces[MESSAGE::UserId];
             //set id
             bool convertOk2;
             this->ownID = id.toInt(&convertOk2); //default to 0 if fail
             if (!convertOk2 || !convertOk){
+                qDebug() << "Invalid nonce recieve";
                 rejectPacket(ERROR::InvalidSessionNonce);
                 break;
             }
@@ -203,17 +264,34 @@ void ChatClient::readPacket()
         dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
         //decrypt
         QString text = Custom::decrypt(this->key, iv, ciphertext);
+        qDebug()<< "Recieved decrypted text: " << text;
         //split by DELIMITER
         QStringList pieces = text.split(DELIMITER);
         if (pieces.size() >= MESSAGE::Section){
+            //convert to int (nonce)
+            QString textNonce = pieces[MESSAGE::Nonce];
+            bool convertOk;
+            int nonce = textNonce.toInt(&convertOk);
+            if (!convertOk)
+                break;
+            //check if correct nonce
+            if (nonce == this->nonce + 1){
+                //increase nonce
+                Custom::nonceIncrement(this->nonce);
+            }
+            //convert to int(UserId)
             QString textUserid = pieces[MESSAGE::UserId];
             //convert to int
-            bool convertOk;
             int userid = textUserid.toInt(&convertOk);
             if (!convertOk)
                 break;
             QString username = "";
-            pieces.removeAt(MESSAGE::UserId);
+
+            //remove nonce from msg
+            pieces.removeFirst();
+            //remove userid from msg
+            pieces.removeFirst();
+
             QString msg = pieces.join("");
             //check if user not in chat room
             const int userlistSize = userList.size();
@@ -327,13 +405,6 @@ void ChatClient::readPacket()
         EType e;
         dataStream >> e;
         switch(e){
-        case ERROR::InvalidSize:
-        {
-            //resend previous packet
-            if (this->clientSoc)
-                this->clientSoc->write(prevData, prevData.size());
-            break;
-        }
         case ERROR::InvalidToken:
             //re-init
             initConnection();
@@ -362,6 +433,12 @@ void ChatClient::readPacket()
 }
 
 void ChatClient::initConnection(){
+    /*
+     * This function attempt to initate host handshaking
+     *
+     * Input: Nil
+     * Output: Nil
+     */
     // send PROTOCOL_TYPE::Init with length of 0
     QByteArray data;
     QDataStream stream(&data, QIODevice::WriteOnly);
@@ -372,16 +449,14 @@ void ChatClient::initConnection(){
 
     if (this->clientSoc)
         this->clientSoc->write(data, PROTOCOL::HeaderSize);
-    //save for resend
-    prevData = QByteArray(data);
 }
 
 void ChatClient::sendServerVerify(QString sessionkey,QString verifyIV, QString encAuth){
     /*
      * This function attempt to host chat server with specified group size
      *
-     * Input: int groupSize for limiting number of connected user
-     * Output: Server start listening at PORT
+     * Input: int groupSize -> for limiting number of connected user
+     * Output: Nil
      */
     // set key
     if (!Custom::setKey(this->key, sessionkey))
@@ -405,6 +480,4 @@ void ChatClient::sendServerVerify(QString sessionkey,QString verifyIV, QString e
 
     if (this->clientSoc)
         this->clientSoc->write(data, PROTOCOL::HeaderSize + totalsize);
-    //save for resend
-    prevData = QByteArray(data);
 }

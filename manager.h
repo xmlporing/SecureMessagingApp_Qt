@@ -72,7 +72,6 @@ public slots:
     void showCreateGroup();
     void hostServer(int groupSize);
     void displayMsg(QString user, QString msg);
-    void chatRoomSendMsg(QString msg);
 };
 
 #endif // MANAGER_H

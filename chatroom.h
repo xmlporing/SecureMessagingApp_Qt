@@ -2,6 +2,7 @@
 #define CHATROOM_H
 
 #include "library.h"
+#include <QTimer>
 
 namespace Ui {
 class Chatroom;
@@ -21,12 +22,15 @@ public:
 private:
     Ui::Chatroom *ui;
     QString user;
+    int count;
 
 private slots:
     void on_sendMsgbtn_clicked();
     void on_returnBtn_clicked();
+    void clearCount();
 
 signals:
+    void errorOccur(QString errMsg);
     void leaveRoom();
     void typeMsg(QString msg);
 };
