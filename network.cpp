@@ -130,7 +130,7 @@ QByteArray Custom::encrypt(CryptoPP::SecByteBlock secretKey, QByteArray& IV, QSt
     }
 
     //ciphertext
-    QByteArray encryptedText(ciphertext.c_str(), ciphertext.length());
+    QByteArray encryptedText(ciphertext.c_str(), (int)ciphertext.length());
 
     //return
     return encryptedText;

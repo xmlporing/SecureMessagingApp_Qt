@@ -40,6 +40,7 @@ bool Server::startServer(int maxUserCount)
     }
     //set maxCount
     this->maxCount = maxUserCount;
+    this->masterKey = CryptoPP::SecByteBlock(0x00,CryptoPP::AES::DEFAULT_KEYLENGTH);
     //success
     return true;
 }
@@ -145,6 +146,7 @@ void Server::setMasterKey(QString key){
      * Input: QString key -> key that is base64 encoded
      * Output: Nil unless there is error setting the key
      */
+    qDebug() << "Set key as " << key;
     if (!Custom::setKey(this->masterKey, key))
         emit error("There is some problem with the login, please logout and try again later.");
 }

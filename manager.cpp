@@ -441,8 +441,10 @@ void Manager::hostServer(int groupSize)
     socServer = new Server(this);
     //check if unable to start
     if(socServer->startServer(groupSize)){
+        qDebug() << "No issue";
         //set masterkey for token verification
         socServer->setMasterKey(this->token);
+        qDebug() << "Connecting signal";
         //connect signal
         // update web server count
         connect(socServer, &Server::updateCount, [this](int count){
@@ -455,10 +457,13 @@ void Manager::hostServer(int groupSize)
            //display error
            this->displayMessageBox(errMsg);
         });
+        qDebug() << "socServer setup hao le";
     }else{
+        qDebug() << "Deleting";
         //delete chat server
         delete socServer;
         socServer = NULL;
+        qDebug() << "deleted";
     }
 }
 
