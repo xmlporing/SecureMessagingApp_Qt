@@ -22,7 +22,7 @@ SSLClient::SSLClient(QObject *parent) : QObject(parent)
     }
 
     //debugging 1) locally(true) 2) network(false)
-    debugging = true;
+    debugging = false;
 }
 
 void SSLClient::registerAcc(const QString &username, const QString &password)

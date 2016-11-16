@@ -84,6 +84,11 @@ Manager::Manager(QObject *parent) : QObject(parent)
     connect(&httpsClient, &SSLClient::errorOccur, [this](QString msg){
         displayMessageBox(msg);
     });
+    // send success message
+    connect(&httpsClient, &SSLClient::successMsg, [this](QString msg){
+        trackUi(startWindowUi);
+        displayMessageBox(msg);
+    });
 }
 
 Manager::~Manager()
