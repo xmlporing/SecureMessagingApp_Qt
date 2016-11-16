@@ -124,7 +124,7 @@ void SSLClient::createChatRoom(const QString &username, const QString &token,
     request.setUrl(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
-    reply = manager->put(request,jsonPost);//(request, jsonPost);
+    reply = manager->post(request,jsonPost);//(request, jsonPost);
     reply->ignoreSslErrors(expectedSslErrors);
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveCreateChatRoom();
