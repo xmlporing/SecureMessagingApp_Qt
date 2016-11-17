@@ -271,9 +271,11 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
             //update username
             wlObj->userName = text;
+            //update verification status
+            wlObj->verified = true;
             //loop to send current userlist
             for (int i = 0; i < connectedUser.size(); i++){
-                sendPacket(connectedUser.at(i), PROTOCOL_TYPE::ClientJoin,
+                sendPacket(wlObj, PROTOCOL_TYPE::ClientJoin,
                            DELIMITER + QString::number(connectedUser.at(i)->userId) + DELIMITER + connectedUser.at(i)->userName);
             }
             //send to all clientJoin

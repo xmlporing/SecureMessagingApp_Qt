@@ -18,7 +18,7 @@ void ChatClient::init(){
      * Output: Nil
      */
     this->nonce = 0;
-    this->ownID = 0;
+    this->ownID = -1;
     this->ownUsername = "";
     this->connectionState = false;
     this->key = CryptoPP::SecByteBlock(0x00,CryptoPP::AES::DEFAULT_KEYLENGTH);
