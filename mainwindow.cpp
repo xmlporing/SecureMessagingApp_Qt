@@ -56,3 +56,27 @@ void MainWindow::on_createAccbtn_clicked()
     //show registration UI
     emit createAcc();
 }
+
+void MainWindow::on_actionExit_triggered() {
+    /*
+     * This function quit the application
+     *
+     * Signal from: File -> Exit from toolbar
+     * Input: Nil
+     * Output: Nil
+     */
+    QApplication::quit();
+}
+
+void MainWindow::on_actionAbout_triggered() {
+    /*
+     * This function display the application details
+     *
+     * Signal from: Help -> About from toolbar
+     * Input: Nil
+     * Output: Nil
+     */
+    QMessageBox msgBox;
+    msgBox.setText("Secure Messaging Application created by Team 8 for ICT3103.");
+    msgBox.exec();
+}

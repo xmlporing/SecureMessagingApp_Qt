@@ -319,11 +319,13 @@ void ChatClient::readPacket()
         QString text = Custom::decrypt(this->key, iv, ciphertext);
         //split by DELIMITER
         QStringList pieces = text.split(DELIMITER);
+        qDebug()<< pieces;
         if (pieces.size() == MESSAGE::Section){
             QString textUserid = pieces[MESSAGE::UserId];
             //convert to int
             bool convertOk;
             int userid = textUserid.toInt(&convertOk);
+            qDebug() << userid;
             if (!convertOk)
                 break;
             QString username = pieces[MESSAGE::MsgValue];

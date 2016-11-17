@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QMessageBox> //pop up alert
+#include "library.h"
 
 namespace Ui {
     class MainWindow;
@@ -27,6 +28,8 @@ signals:
 private slots:
     void on_signInbtn_clicked();
     void on_createAccbtn_clicked();
+    void on_actionExit_triggered();
+    void on_actionAbout_triggered();
 };
 
 #endif // MAINWINDOW_H
