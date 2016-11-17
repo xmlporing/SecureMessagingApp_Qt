@@ -249,7 +249,8 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
                 //generate nonce
                 wlObj->nonce = generateNonce();
                 //send nonce and allocated id
-                sendPacket(wlObj, PROTOCOL_TYPE::SendNonce, QString::number(wlObj->nonce) + DELIMITER + QString::number(wlObj->userId) + DELIMITER);
+                sendPacket(wlObj, PROTOCOL_TYPE::SendNonce,
+                           QString::number(wlObj->nonce) + DELIMITER + QString::number(wlObj->userId) + DELIMITER);
             }
         }
         break;
