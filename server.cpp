@@ -12,7 +12,6 @@ Server::Server(QObject *parent) :
 Server::~Server()
 {
     closeServer();
-    qDebug() << "Closing server";
 }
 
 // ******* Public Function *******
@@ -28,13 +27,11 @@ bool Server::startServer(int maxUserCount)
      */
     if(!this->listen(QHostAddress::Any,PORT))
     {
-        qDebug() << "Could not start server";
         emit error("Unable to host at " + QString::number(PORT));
         // display some error and return to chatgroupui
         return false;
     }
     if (maxUserCount <= 1){
-        qDebug() << "User set too low max user count.";
         emit error("Maximum user size are too small.");
         return false;
     }
@@ -146,7 +143,6 @@ void Server::setMasterKey(QString key){
      * Input: QString key -> key that is base64 encoded
      * Output: Nil unless there is error setting the key
      */
-    qDebug() << "Set key as " << key;
     if (!Custom::setKey(this->masterKey, key))
         emit error("There is some problem with the login, please logout and try again later.");
 }
@@ -169,9 +165,6 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
      *      2) const whiteListObj* wlObj -> connected user
      * Output: Nil
      */
-    // Debug
-    qDebug() << "Server::processIncomingData -> Data size: " << data.size();
-
     while (data.size() > 0){
         // check if data is smaller than expected
         if (data.size() < PROTOCOL::HeaderSize)
@@ -242,7 +235,6 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             QString sendToken = QString::fromLocal8Bit(contents.mid(0,PROTOCOL::TokenSize));
             if (sendToken == wlObj->token){
                 //if same set, session key
-                qDebug() << "Same";
                 QString obtainedKey = QString::fromLocal8Bit(contents.mid(PROTOCOL::TokenSize,dLength - PROTOCOL::TokenSize));
                 //key from byte 16 to dLength
                 if (!Custom::setKey( wlObj->key,obtainedKey)){
@@ -296,11 +288,9 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
                 dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
                 //decrypt
                 QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
-                qDebug()<< "Recieved decrypted text: " << text;
                 //split by DELIMITER
                 QStringList pieces = text.split(DELIMITER);
                 if (pieces.size() >= MESSAGE::Section){
-                    qDebug() << pieces;
                     //convert to int (nonce)
                     QString textNonce = pieces[MESSAGE::Nonce];
                     bool convertOk;
@@ -309,10 +299,8 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
                         break;
                     //check if correct nonce
                     if (nonce != wlObj->nonce + 1){
-                        qDebug() << "Sent nonce is "
-                                 << nonce
-                                 << " , my nonce is "
-                                 << wlObj->nonce;
+                        //invalid nonce, don't process
+                        break;
                     }
                     //increase nonce
                     Custom::nonceIncrement(wlObj->nonce);
@@ -405,7 +393,6 @@ bool Server::compareIP(const QHostAddress& ip){
      *      1) True: local ip
      *      2) False: non-local ip
      */
-    qDebug() << ip.toString();
     if (QHostAddress(ip.toIPv4Address()) == QHostAddress(QHostAddress::LocalHost))
         return true;
     return false;
@@ -456,24 +443,22 @@ void Server::incomingConnection(qintptr socketDescriptor)
      * Input: qintptr socketDescriptor -> to open a socket
      * Output: 16 char of hex encoded string
      */
-    // We have a new connection
-    qDebug() << socketDescriptor << " Connecting...";
-
     // check for over hitting of maxCount
     if (connectedUser.size() + 1 > maxCount){
         //try to detect and remove disconnected user
         for(int i = 0; i < connectedUser.size();){
             if (connectedUser.at(i)->socket->state() == QTcpSocket::UnconnectedState){
-                qDebug() << "Removing disconnected user, " << connectedUser.at(i)->userId;
+                //delete disconnected user
                 delete connectedUser[i];
+                //remove it
                 connectedUser.remove(i);
             }else{
+                //next element
                 i++;
             }
         }
         //check if still above count
         if (connectedUser.size() + 1 > maxCount){
-            qDebug() << "Dropping connection by writing ERROR::ROOMFULL";
             //sending room full packet
             QTcpSocket * client = new QTcpSocket();
             client->setSocketDescriptor(socketDescriptor);
@@ -483,6 +468,7 @@ void Server::incomingConnection(qintptr socketDescriptor)
                                                               false);
             rejectPacket(whitelistStruct, ERROR::RoomFull);
             delete whitelistStruct;
+            //done sending
             return;
         }
     }
@@ -498,7 +484,6 @@ void Server::incomingConnection(qintptr socketDescriptor)
                                                       client,
                                                       verify);
     if (verify){ //own client, skip server verification
-        qDebug() << "Own client sending nonce now";
         //send nonce
         whitelistStruct->nonce = generateNonce();
         sendPacket(whitelistStruct, PROTOCOL_TYPE::SendNonce, QString::number(whitelistStruct->nonce) + DELIMITER + QString::number(whitelistStruct->userId) + DELIMITER);
@@ -538,10 +523,8 @@ void Server::sendToAll(QString data, TType t)
      *      2) TType t -> type of data to be forwarded
      * Output: Nil
      */
-    int i = 0;
-    qDebug() << "Server::sendToAll -> Sending to all with " << data;
     //sending to all connected user;
-    for (;i< connectedUser.size(); i++){
+    for (int i = 0;i< connectedUser.size(); i++){
         // valid ptr and has been verified to recieve msg
         if (connectedUser.at(i) && connectedUser.at(i)->verified){
             // valid connected socket

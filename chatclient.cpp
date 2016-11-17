@@ -21,6 +21,7 @@ void ChatClient::init(){
     this->ownID = -1;
     this->ownUsername = "";
     this->connectionState = false;
+    this->checkDisconnect = false;
     this->key = CryptoPP::SecByteBlock(0x00,CryptoPP::AES::DEFAULT_KEYLENGTH);
     this->userList.clear();
 }
@@ -70,6 +71,8 @@ bool ChatClient::connectToHost(QString ip)
         connect(this->clientSoc, &QTcpSocket::disconnected, [this](){
             //self delete
             this->clientSoc->deleteLater();
+            //set checkDisconnect flag
+            this->checkDisconnect = true;
             //emit error
             emit error("You have been disconnected");
         });
@@ -92,14 +95,14 @@ void ChatClient::shut(){
      * Input: Nil
      * Output: Nil
      */
-    //if null mean has been reset, dont need to call twice
-    if (clientSoc){
-        //reset
-        init();
+    //if null & disconnect flag not set, disconnect client
+    if (clientSoc && !checkDisconnect){
         //disconnect if connected
         if (clientSoc->state() == QTcpSocket::ConnectedState)
             clientSoc->abort();
     }
+    //reset
+    init();
     clientSoc = NULL;
 
 }
@@ -241,7 +244,6 @@ void ChatClient::readPacket()
             QString text = Custom::decrypt(this->key, iv, ciphertext);
             //split by DELIMITER
             QStringList pieces = text.split(DELIMITER);
-            qDebug() << "Recieved nonce " << text;
             if (pieces.size() == MESSAGE::Section){
                 QString nonce = pieces[MESSAGE::Nonce];
                 //set nonce
@@ -252,7 +254,6 @@ void ChatClient::readPacket()
                 bool convertOk2;
                 this->ownID = id.toInt(&convertOk2); //default to 0 if fail
                 if (!convertOk2 || !convertOk){
-                    qDebug() << "Invalid nonce recieve";
                     rejectPacket(ERROR::InvalidSessionNonce);
                     break;
                 }
@@ -275,7 +276,6 @@ void ChatClient::readPacket()
             dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
             //decrypt
             QString text = Custom::decrypt(this->key, iv, ciphertext);
-            qDebug()<< "Recieved decrypted text: " << text;
             //split by DELIMITER
             QStringList pieces = text.split(DELIMITER);
             if (pieces.size() >= MESSAGE::Section){
@@ -345,7 +345,6 @@ void ChatClient::readPacket()
                     if (userList[i].userId == userid || userList[i].userName == username)
                         break;
                 }
-                qDebug() << "I is " << i << " ,username is " << username;
                 //if yes, update vector, else reject
                 if (i == userlistSize){
                     emit userJoin(username);
@@ -422,7 +421,6 @@ void ChatClient::readPacket()
                 break;
             case ERROR::RoomFull:
             {
-                qDebug() << "Room full error";
                 //check if already connected (connectionState is true)
                 if (!getConnectivity())
                     //notify user about room full

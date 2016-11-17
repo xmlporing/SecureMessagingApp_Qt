@@ -46,6 +46,7 @@ private:
     QString ownGroupName;
     QVector<UserList> userList;
     bool connectionState;
+    bool checkDisconnect;
     CryptoPP::SecByteBlock key;
     QByteArray prevData;
 

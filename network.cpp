@@ -26,46 +26,6 @@ QString Custom::decrypt(CryptoPP::SecByteBlock secretKey, QByteArray IV, QByteAr
     return decryptedtext;
 }
 
-/*
-QByteArray Custom::decrypt(QString secretKey, QString IV, QString cipherText){
-    //Convert base64 encoded inputs
-    CryptoPP::SecByteBlock key(0x00, CryptoPP::AES::DEFAULT_KEYLENGTH);
-    //secret key
-    QByteArray byteSecretKey = QByteArray::fromBase64(secretKey.toLocal8Bit());
-    for (int i=0; i< byteSecretKey.size(); i++){
-        key[i] = byteSecretKey[i];
-    }
-    //iv
-    QByteArray iv = QByteArray::fromBase64(IV.toLocal8Bit());
-    //ciphertext
-    QByteArray cipher = QByteArray::fromBase64(cipherText.toLocal8Bit());
-    //plaintext
-    std::string plaintext;
-
-    try{
-        //init
-        CryptoPP::CBC_Mode< CryptoPP::AES >::Decryption decryptor;
-        decryptor.SetKeyWithIV(key, key.size(), (byte*)iv.data(), iv.size());
-
-        //decrypt
-        CryptoPP::StringSource( (byte*)cipher.data(), cipher.size(), true,
-           new CryptoPP::StreamTransformationFilter( decryptor,
-              new CryptoPP::StringSink( plaintext )
-           ) // StreamTransformationFilter
-        ); // StringSource
-    }catch( const CryptoPP::Exception& e){
-        qDebug() << e.what();
-    }
-
-    //plaintext
-    QString decryptedtext = QString::fromStdString(plaintext);
-    qDebug() << decryptedtext;
-
-    //return
-    return decryptedtext.toLocal8Bit();
-}
-*/
-
 QString Custom::decrypt(QString secretKey, QString IV, QString cipherText){
     //Convert base64 encoded inputs
     CryptoPP::SecByteBlock key(0x00, CryptoPP::AES::DEFAULT_KEYLENGTH);
