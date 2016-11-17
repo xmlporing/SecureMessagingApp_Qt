@@ -49,6 +49,6 @@ RESOURCES += \
 
 CONFIG += c++11
 
-INCLUDEPATH += C:\Users\Rollin\Desktop\cryptopp565
+INCLUDEPATH += D:\Download\Compressed\cryptopp565
 
-LIBS += C:\Users\Rollin\Desktop\cryptopp565\x64\Output\Release\cryptlib.lib
+LIBS += D:\Download\Compressed\cryptopp565\x64\Output\Release\cryptlib.lib
