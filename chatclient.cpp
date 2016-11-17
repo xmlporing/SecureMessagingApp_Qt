@@ -182,255 +182,259 @@ void ChatClient::readPacket()
         return;
     // read all data in packet
     QByteArray data = clientSoc->readAll();
-    // check if data is smaller than expected
-    if (data.size() < PROTOCOL::HeaderSize)
-        return;
 
-    QDataStream dataStream(data);
-    dataStream.setVersion(QDataStream::Qt_5_7);
+    while (data.size() > 0){
+        // check if data is smaller than expected
+        if (data.size() < PROTOCOL::HeaderSize)
+            return;
 
-    // check for data
-    TType dType = 0x0000;// = static_cast<qint16>data.mid(PROTOCOL::Type,PROTOCOL::TypeSize);
-    dataStream >>dType;
+        QDataStream dataStream(data);
+        dataStream.setVersion(QDataStream::Qt_5_7);
 
-    // check for length and length of value is valid
-    LType dLength = 0x00000000;// = static_cast<qint32>(data.mid(PROTOCOL::Length,PROTOCOL::LengthSize));
-    dataStream >> dLength;
-    if (data.size() != static_cast<int>(dLength) + PROTOCOL::HeaderSize){
-        qDebug() << "Different in length, packet size: "
-                 << data.size()
-                 << " , length value: "
-                 << dLength
-                 << " , Client";
-        return;
-    }
-    switch (dType){
-    case PROTOCOL_TYPE::TokenVerify:
-    {
-        //send token to https
-        QByteArray token;
-        //resize
-        token.resize((int)dLength);
-        dataStream.readRawData(token.data(), (int)dLength);
-        //send to manager
-        emit verifyToken(QString::fromLocal8Bit(token));
-        break;
-    }
-    case PROTOCOL_TYPE::SendNonce:
-    {
-        //update nonce
-        QByteArray iv, ciphertext;
-        //resize
-        iv.resize((int)PROTOCOL::IVSize);
-        ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-        //add to qbytearry
-        dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-        dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-        //decrypt
-        QString text = Custom::decrypt(this->key, iv, ciphertext);
-        //split by DELIMITER
-        QStringList pieces = text.split(DELIMITER);
-        qDebug() << "Recieved nonce " << text;
-        if (pieces.size() == MESSAGE::Section){
-            QString nonce = pieces[MESSAGE::Nonce];
-            //set nonce
-            bool convertOk;
-            this->nonce = nonce.toInt(&convertOk); //default to 0 if fail
-            QString id = pieces[MESSAGE::UserId];
-            //set id
-            bool convertOk2;
-            this->ownID = id.toInt(&convertOk2); //default to 0 if fail
-            if (!convertOk2 || !convertOk){
-                qDebug() << "Invalid nonce recieve";
-                rejectPacket(ERROR::InvalidSessionNonce);
-                break;
-            }
-            //update connectivity
-            this->connectionState = true;
-            //send username to server
-            sendPacket(PROTOCOL_TYPE::UserDetails, this->ownUsername);
+        // check for data
+        TType dType = 0x0000;// = static_cast<qint16>data.mid(PROTOCOL::Type,PROTOCOL::TypeSize);
+        dataStream >>dType;
+
+        // check for length and length of value is valid
+        LType dLength = 0x00000000;// = static_cast<qint32>(data.mid(PROTOCOL::Length,PROTOCOL::LengthSize));
+        dataStream >> dLength;
+        if (data.size() < static_cast<int>(dLength) + PROTOCOL::HeaderSize){
+            qDebug() << "Different in length, packet size: "
+                     << data.size()
+                     << " , length value: "
+                     << dLength
+                     << " , Client";
+            return;
         }
-        break;
-    }
-    case PROTOCOL_TYPE::Message:
-    {
-        //update chat room
-        QByteArray iv, ciphertext;
-        //resize
-        iv.resize((int)PROTOCOL::IVSize);
-        ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-        //add to qbytearry
-        dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-        dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-        //decrypt
-        QString text = Custom::decrypt(this->key, iv, ciphertext);
-        qDebug()<< "Recieved decrypted text: " << text;
-        //split by DELIMITER
-        QStringList pieces = text.split(DELIMITER);
-        if (pieces.size() >= MESSAGE::Section){
-            //convert to int (nonce)
-            QString textNonce = pieces[MESSAGE::Nonce];
-            bool convertOk;
-            int nonce = textNonce.toInt(&convertOk);
-            if (!convertOk)
-                break;
-            //check if correct nonce
-            if (nonce == this->nonce + 1){
-                //increase nonce
-                Custom::nonceIncrement(this->nonce);
-            }
-            //convert to int(UserId)
-            QString textUserid = pieces[MESSAGE::UserId];
-            //convert to int
-            int userid = textUserid.toInt(&convertOk);
-            if (!convertOk)
-                break;
-            QString username = "";
-
-            //remove nonce from msg
-            pieces.removeFirst();
-            //remove userid from msg
-            pieces.removeFirst();
-
-            QString msg = pieces.join("");
-            //check if user not in chat room
-            const int userlistSize = userList.size();
-            for (int i = 0; i < userlistSize; i++){
-                if (userList[i].userId == userid)
-                    username = userList[i].userName;
-            }
-            if (username != "")
-                //send to manager
-                emit displayMsg(username,msg);
+        switch (dType){
+        case PROTOCOL_TYPE::TokenVerify:
+        {
+            //send token to https
+            QByteArray token;
+            //resize
+            token.resize((int)dLength);
+            dataStream.readRawData(token.data(), (int)dLength);
+            //send to manager
+            emit verifyToken(QString::fromLocal8Bit(token));
+            break;
         }
-        break;
-    }
-    case PROTOCOL_TYPE::ClientJoin:
-    {
-        // read packet
-        QByteArray iv, ciphertext;
-        //resize
-        iv.resize((int)PROTOCOL::IVSize);
-        ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-        //add to qbytearry
-        dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-        dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-        //decrypt
-        QString text = Custom::decrypt(this->key, iv, ciphertext);
-        //split by DELIMITER
-        QStringList pieces = text.split(DELIMITER);
-        qDebug()<< pieces;
-        if (pieces.size() == MESSAGE::Section){
-            QString textUserid = pieces[MESSAGE::UserId];
+        case PROTOCOL_TYPE::SendNonce:
+        {
+            //update nonce
+            QByteArray iv, ciphertext;
+            //resize
+            iv.resize((int)PROTOCOL::IVSize);
+            ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
+            //add to qbytearry
+            dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
+            dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
+            //decrypt
+            QString text = Custom::decrypt(this->key, iv, ciphertext);
+            //split by DELIMITER
+            QStringList pieces = text.split(DELIMITER);
+            qDebug() << "Recieved nonce " << text;
+            if (pieces.size() == MESSAGE::Section){
+                QString nonce = pieces[MESSAGE::Nonce];
+                //set nonce
+                bool convertOk;
+                this->nonce = nonce.toInt(&convertOk); //default to 0 if fail
+                QString id = pieces[MESSAGE::UserId];
+                //set id
+                bool convertOk2;
+                this->ownID = id.toInt(&convertOk2); //default to 0 if fail
+                if (!convertOk2 || !convertOk){
+                    qDebug() << "Invalid nonce recieve";
+                    rejectPacket(ERROR::InvalidSessionNonce);
+                    break;
+                }
+                //update connectivity
+                this->connectionState = true;
+                //send username to server
+                sendPacket(PROTOCOL_TYPE::UserDetails, this->ownUsername);
+            }
+            break;
+        }
+        case PROTOCOL_TYPE::Message:
+        {
+            //update chat room
+            QByteArray iv, ciphertext;
+            //resize
+            iv.resize((int)PROTOCOL::IVSize);
+            ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
+            //add to qbytearry
+            dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
+            dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
+            //decrypt
+            QString text = Custom::decrypt(this->key, iv, ciphertext);
+            qDebug()<< "Recieved decrypted text: " << text;
+            //split by DELIMITER
+            QStringList pieces = text.split(DELIMITER);
+            if (pieces.size() >= MESSAGE::Section){
+                //convert to int (nonce)
+                QString textNonce = pieces[MESSAGE::Nonce];
+                bool convertOk;
+                int nonce = textNonce.toInt(&convertOk);
+                if (!convertOk)
+                    break;
+                //check if correct nonce
+                if (nonce == this->nonce + 1){
+                    //increase nonce
+                    Custom::nonceIncrement(this->nonce);
+                }
+                //convert to int(UserId)
+                QString textUserid = pieces[MESSAGE::UserId];
+                //convert to int
+                int userid = textUserid.toInt(&convertOk);
+                if (!convertOk)
+                    break;
+                QString username = "";
+
+                //remove nonce from msg
+                pieces.removeFirst();
+                //remove userid from msg
+                pieces.removeFirst();
+
+                QString msg = pieces.join("");
+                //check if user not in chat room
+                const int userlistSize = userList.size();
+                for (int i = 0; i < userlistSize; i++){
+                    if (userList[i].userId == userid)
+                        username = userList[i].userName;
+                }
+                if (username != "")
+                    //send to manager
+                    emit displayMsg(username,msg);
+            }
+            break;
+        }
+        case PROTOCOL_TYPE::ClientJoin:
+        {
+            // read packet
+            QByteArray iv, ciphertext;
+            //resize
+            iv.resize((int)PROTOCOL::IVSize);
+            ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
+            //add to qbytearry
+            dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
+            dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
+            //decrypt
+            QString text = Custom::decrypt(this->key, iv, ciphertext);
+            //split by DELIMITER
+            QStringList pieces = text.split(DELIMITER);
+            if (pieces.size() == MESSAGE::Section){
+                QString textUserid = pieces[MESSAGE::UserId];
+                //convert to int
+                bool convertOk;
+                int userid = textUserid.toInt(&convertOk);
+                if (!convertOk)
+                    break;
+                QString username = pieces[MESSAGE::MsgValue];
+                //check if user not in chat room
+                const int userlistSize = userList.size();
+                int i = 0;
+                for (; i < userlistSize; i++){
+                    if (userList[i].userId == userid || userList[i].userName == username)
+                        break;
+                }
+                qDebug() << "I is " << i << " ,username is " << username;
+                //if yes, update vector, else reject
+                if (i == userlistSize){
+                    emit userJoin(username);
+                    userList.append(UserList(userid, username));
+                }
+            }
+            break;
+        }
+        case PROTOCOL_TYPE::ClientQuit:
+        {
+            // read packet
+            QByteArray iv, ciphertext;
+            //resize
+            iv.resize((int)PROTOCOL::IVSize);
+            ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
+            //add to qbytearry
+            dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
+            dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
+            //decrypt
+            QString text = Custom::decrypt(this->key, iv, ciphertext);
             //convert to int
             bool convertOk;
-            int userid = textUserid.toInt(&convertOk);
-            qDebug() << userid;
+            int userid = text.toInt(&convertOk);
             if (!convertOk)
                 break;
-            QString username = pieces[MESSAGE::MsgValue];
-            //check if user not in chat room
+            //check if user within the chat room
             const int userlistSize = userList.size();
             int i = 0;
             for (; i < userlistSize; i++){
-                if (userList[i].userId == userid || userList[i].userName == username)
+                if (userList[i].userId == userid)
                     break;
             }
-            qDebug() << "I is " << i << " ,username is " << username;
-            //if yes, update vector, else reject
-            if (i == userlistSize){
-                emit userJoin(username);
-                userList.append(UserList(userid, username));
+            //if yes, reject, else update vector
+            if (i != userlistSize){
+                emit userQuit(userList[i].userName);
+                userList.remove(i);
             }
-        }
-        break;
-    }
-    case PROTOCOL_TYPE::ClientQuit:
-    {
-        // read packet
-        QByteArray iv, ciphertext;
-        //resize
-        iv.resize((int)PROTOCOL::IVSize);
-        ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-        //add to qbytearry
-        dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-        dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-        //decrypt
-        QString text = Custom::decrypt(this->key, iv, ciphertext);
-        //convert to int
-        bool convertOk;
-        int userid = text.toInt(&convertOk);
-        if (!convertOk)
             break;
-        //check if user within the chat room
-        const int userlistSize = userList.size();
-        int i = 0;
-        for (; i < userlistSize; i++){
-            if (userList[i].userId == userid)
-                break;
         }
-        //if yes, reject, else update vector
-        if (i != userlistSize){
-            emit userQuit(userList[i].userName);
-            userList.remove(i);
-        }
-        break;
-    }
-    case PROTOCOL_TYPE::HostQuit:
-    {
-        //disconnect procedure
-        // read packet
-        QByteArray iv, ciphertext;
-        //resize
-        iv.resize((int)PROTOCOL::IVSize);
-        ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-        //add to qbytearry
-        dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-        dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-        //decrypt
-        QString text = Custom::decrypt(this->key, iv, ciphertext);
-        //check nonce
-        bool convertOk;
-        int sendNonce = text.toInt(&convertOk); //default to 0 if fail
-        //check for valid nonce
-        if (sendNonce != this->nonce || !convertOk){
-            rejectPacket(ERROR::InvalidSessionNonce);
-        }else{
-            //disconnect
-            emit error("Host has left the chatroom.");
-        }
-        break;
-    }
-    case PROTOCOL_TYPE::Reject:
-    {
-        //disconnect procedure as not authenticated
-        EType e;
-        dataStream >> e;
-        switch(e){
-        case ERROR::InvalidToken:
-            //re-init
-            initConnection();
-            break;
-        case ERROR::RoomFull:
+        case PROTOCOL_TYPE::HostQuit:
         {
-            qDebug() << "Room full error";
-            //check if already connected (connectionState is true)
-            if (!getConnectivity())
-                //notify user about room full
-                emit error("Chatroom is full.");
+            //disconnect procedure
+            // read packet
+            QByteArray iv, ciphertext;
+            //resize
+            iv.resize((int)PROTOCOL::IVSize);
+            ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
+            //add to qbytearry
+            dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
+            dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
+            //decrypt
+            QString text = Custom::decrypt(this->key, iv, ciphertext);
+            //check nonce
+            bool convertOk;
+            int sendNonce = text.toInt(&convertOk); //default to 0 if fail
+            //check for valid nonce
+            if (sendNonce != this->nonce || !convertOk){
+                rejectPacket(ERROR::InvalidSessionNonce);
+            }else{
+                //disconnect
+                emit error("Host has left the chatroom.");
+            }
             break;
         }
-        //illegal packet
+        case PROTOCOL_TYPE::Reject:
+        {
+            //disconnect procedure as not authenticated
+            EType e;
+            dataStream >> e;
+            switch(e){
+            case ERROR::InvalidToken:
+                //re-init
+                initConnection();
+                break;
+            case ERROR::RoomFull:
+            {
+                qDebug() << "Room full error";
+                //check if already connected (connectionState is true)
+                if (!getConnectivity())
+                    //notify user about room full
+                    emit error("Chatroom is full.");
+                break;
+            }
+            //illegal packet
+            default:
+                //ignore
+                break;
+            }
+            break;
+        }
+        //Illegal operation
         default:
-            //ignore
+            rejectPacket(ERROR::UnrecognisedPacket);
             break;
         }
-        break;
-    }
-    //Illegal operation
-    default:
-        rejectPacket(ERROR::UnrecognisedPacket);
-        break;
+
+        //remove consumed packets
+        data.remove(0, static_cast<int>(dLength) + PROTOCOL::HeaderSize);
     }
 }
 

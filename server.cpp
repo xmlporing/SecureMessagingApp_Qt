@@ -171,111 +171,95 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
      */
     // Debug
     qDebug() << "Server::processIncomingData -> Data size: " << data.size();
-    // check if data is smaller than expected
-    if (data.size() < PROTOCOL::HeaderSize)
-        return;
 
-    QDataStream dataStream(data);
-    dataStream.setVersion(QDataStream::Qt_5_7);
+    while (data.size() > 0){
+        // check if data is smaller than expected
+        if (data.size() < PROTOCOL::HeaderSize)
+            return;
 
-    // check for data
-    TType dType = 0x0000;// = static_cast<qint16>data.mid(PROTOCOL::Type,PROTOCOL::TypeSize);
-    dataStream >>dType;
+        QDataStream dataStream(data);
+        dataStream.setVersion(QDataStream::Qt_5_7);
 
-    // check for length and length of value is valid
-    LType dLength = 0x00000000;// = static_cast<qint32>(data.mid(PROTOCOL::Length,PROTOCOL::LengthSize));
-    dataStream >> dLength;
-    if (data.size() != (int)dLength + PROTOCOL::HeaderSize){
-        qDebug() << "Different in length, packet size: "
-                 << data.size()
-                 << " , length value: "
-                 << dLength
-                 << " , Type of data: "
-                 << dType
-                 << " , Raw Data: "
-                 << data;
-        rejectPacket(wlObj,ERROR::InvalidSize);
-        return;
-    }
+        // check for data
+        TType dType = 0x0000;// = static_cast<qint16>data.mid(PROTOCOL::Type,PROTOCOL::TypeSize);
+        dataStream >> dType;
 
-    switch (dType){
-    case PROTOCOL_TYPE::Init:
-        //send token to connected non-verified user
-        if (!wlObj->verified){
-            //have not been verified
-            QString token = generateToken();
-            // set to wlObj
-            wlObj->token = token;
-            // sending raw packet
-            // check for valid socket
-            if(!wlObj->socket)
-                break;
-            // // send PROTOCOL_TYPE::TokenVerify with fixed size token
-            QByteArray data;
-            QDataStream stream(&data, QIODevice::WriteOnly);
-            stream.setVersion(DATASTREAMVER);
-
-            stream << TType(PROTOCOL_TYPE::TokenVerify)
-                   << LType(token.size());
-            stream.writeRawData(token.toLocal8Bit(), token.size());
-
-            wlObj->socket->write(data, PROTOCOL::HeaderSize + token.size());
+        // check for length and length of value is valid
+        LType dLength = 0x00000000;// = static_cast<qint32>(data.mid(PROTOCOL::Length,PROTOCOL::LengthSize));
+        dataStream >> dLength;
+        if (data.size() < (int)dLength + PROTOCOL::HeaderSize){
+            qDebug() << "Different in length, packet size: "
+                     << data.size()
+                     << " , length value: "
+                     << dLength
+                     << " , Type of data: "
+                     << dType
+                     << " , Raw Data: "
+                     << data;
+            rejectPacket(wlObj,ERROR::InvalidSize);
+            return;
         }
-        break;
-    case PROTOCOL_TYPE::ServerVerify:
-    {
-        //compare with own secret ***
-        QByteArray iv, ciphertext;
-        //resize
-        iv.resize((int)PROTOCOL::IVSize);
-        ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-        //add to qbytearry
-        dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-        dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-        //decrypt
-        QString text = Custom::decrypt(this->masterKey, iv, ciphertext);
-        //convert to qbytearray
-        QByteArray contents = text.toLocal8Bit();
-        //token from byte 0 to 15
-        QString sendToken = QString::fromLocal8Bit(contents.mid(0,PROTOCOL::TokenSize));
-        if (sendToken == wlObj->token){
-            //if same set, session key
-            qDebug() << "Same";
-            QString obtainedKey = QString::fromLocal8Bit(contents.mid(PROTOCOL::TokenSize,dLength - PROTOCOL::TokenSize));
-            //key from byte 16 to dLength
-            if (!Custom::setKey( wlObj->key,obtainedKey)){
-                rejectPacket(wlObj, ERROR::InvalidToken);
-            }else{
-                //generate nonce
-                wlObj->nonce = generateNonce();
-                //send nonce and allocated id
-                sendPacket(wlObj, PROTOCOL_TYPE::SendNonce,
-                           QString::number(wlObj->nonce) + DELIMITER + QString::number(wlObj->userId) + DELIMITER);
+
+        switch (dType){
+        case PROTOCOL_TYPE::Init:
+            //send token to connected non-verified user
+            if (!wlObj->verified){
+                //have not been verified
+                QString token = generateToken();
+                // set to wlObj
+                wlObj->token = token;
+                // sending raw packet
+                // check for valid socket
+                if(!wlObj->socket)
+                    break;
+                // // send PROTOCOL_TYPE::TokenVerify with fixed size token
+                QByteArray data2;
+                QDataStream stream(&data2, QIODevice::WriteOnly);
+                stream.setVersion(DATASTREAMVER);
+
+                stream << TType(PROTOCOL_TYPE::TokenVerify)
+                       << LType(token.size());
+                stream.writeRawData(token.toLocal8Bit(), token.size());
+
+                wlObj->socket->write(data2, PROTOCOL::HeaderSize + token.size());
             }
+            break;
+        case PROTOCOL_TYPE::ServerVerify:
+        {
+            //compare with own secret ***
+            QByteArray iv, ciphertext;
+            //resize
+            iv.resize((int)PROTOCOL::IVSize);
+            ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
+            //add to qbytearry
+            dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
+            dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
+            //decrypt
+            QString text = Custom::decrypt(this->masterKey, iv, ciphertext);
+            //convert to qbytearray
+            QByteArray contents = text.toLocal8Bit();
+            //token from byte 0 to 15
+            QString sendToken = QString::fromLocal8Bit(contents.mid(0,PROTOCOL::TokenSize));
+            if (sendToken == wlObj->token){
+                //if same set, session key
+                qDebug() << "Same";
+                QString obtainedKey = QString::fromLocal8Bit(contents.mid(PROTOCOL::TokenSize,dLength - PROTOCOL::TokenSize));
+                //key from byte 16 to dLength
+                if (!Custom::setKey( wlObj->key,obtainedKey)){
+                    rejectPacket(wlObj, ERROR::InvalidToken);
+                }else{
+                    //generate nonce
+                    wlObj->nonce = generateNonce();
+                    //send nonce and allocated id
+                    sendPacket(wlObj, PROTOCOL_TYPE::SendNonce,
+                               QString::number(wlObj->nonce) + DELIMITER + QString::number(wlObj->userId) + DELIMITER);
+                }
+            }
+            break;
         }
-        break;
-    }
-    case PROTOCOL_TYPE::UserDetails:
-    {
-        //compare with own secret ***
-        QByteArray iv, ciphertext;
-        //resize
-        iv.resize((int)PROTOCOL::IVSize);
-        ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-        //add to qbytearry
-        dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-        dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-        //decrypt
-        QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
-        //send to all clientJoin
-        sendToAll(DELIMITER + QString::number(wlObj->userId) + DELIMITER + text, PROTOCOL_TYPE::ClientJoin);
-        break;
-    }
-    case PROTOCOL_TYPE::Message:
-    {
-        //check if verified
-        if (wlObj->verified){
-            //send to all
+        case PROTOCOL_TYPE::UserDetails:
+        {
+            //compare with own secret ***
             QByteArray iv, ciphertext;
             //resize
             iv.resize((int)PROTOCOL::IVSize);
@@ -285,86 +269,118 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
             //decrypt
             QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
-            qDebug()<< "Recieved decrypted text: " << text;
-            //split by DELIMITER
-            QStringList pieces = text.split(DELIMITER);
-            if (pieces.size() >= MESSAGE::Section){
-                qDebug() << pieces;
-                //convert to int (nonce)
-                QString textNonce = pieces[MESSAGE::Nonce];
-                bool convertOk;
-                int nonce = textNonce.toInt(&convertOk);
-                if (!convertOk)
-                    break;
-                //check if correct nonce
-                if (nonce != wlObj->nonce + 1){
-                    qDebug() << "Sent nonce is "
-                             << nonce
-                             << " , my nonce is "
-                             << wlObj->nonce;
-                }
-                //increase nonce
-                Custom::nonceIncrement(wlObj->nonce);
-
-                //convert to int(UserId)
-                QString textUserid = pieces[MESSAGE::UserId];
-                //convert to int
-                textUserid.toInt(&convertOk);
-                if (!convertOk)
-                    break;
-
-                //remove nonce from msg
-                pieces.removeFirst();
-                //remove userId from msg
-                pieces.removeFirst();
-
-                //msg sent by user
-                QString msg = pieces.join("");
-                //send to all
-                sendToAll(textUserid + DELIMITER + msg);
+            //update username
+            wlObj->userName = text;
+            //loop to send current userlist
+            for (int i = 0; i < connectedUser.size(); i++){
+                sendPacket(connectedUser.at(i), PROTOCOL_TYPE::ClientJoin,
+                           DELIMITER + QString::number(connectedUser.at(i)->userId) + DELIMITER + connectedUser.at(i)->userName);
             }
-        }
-        break;
-    }
-    case PROTOCOL_TYPE::ClientQuit:
-    {
-        // read packet
-        QByteArray iv, ciphertext;
-        //resize
-        iv.resize((int)PROTOCOL::IVSize);
-        ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-        //add to qbytearry
-        dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-        dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-        //decrypt
-        QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
-        //convert to int
-        bool convertOk;
-        int userid = text.toInt(&convertOk);
-        if (!convertOk)
+            //send to all clientJoin
+            sendToAll(DELIMITER + QString::number(wlObj->userId) + DELIMITER + text, PROTOCOL_TYPE::ClientJoin);
             break;
-        if (userid == wlObj->userId){
-            int currentCount = connectedUser.size();
-            //change verified flag and disconnect
-            wlObj->verified = false;
-            wlObj->socket->disconnectFromHost();
-            //signal
-            emit updateCount(currentCount - 1);
-            //update all when client quit
-            sendToAll(text, PROTOCOL_TYPE::ClientQuit);
         }
-        break;
-    }
-    case PROTOCOL_TYPE::Reject:
-    {
-        EType e;
-        dataStream >> e;
-        switch(e){
-        case ERROR::InvalidSessionNonce:
+        case PROTOCOL_TYPE::Message:
         {
-            //send again
-            if (!wlObj->verified)
-                sendPacket(wlObj, PROTOCOL_TYPE::TokenVerify, generateToken());
+            //check if verified
+            if (wlObj->verified){
+                //send to all
+                QByteArray iv, ciphertext;
+                //resize
+                iv.resize((int)PROTOCOL::IVSize);
+                ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
+                //add to qbytearry
+                dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
+                dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
+                //decrypt
+                QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
+                qDebug()<< "Recieved decrypted text: " << text;
+                //split by DELIMITER
+                QStringList pieces = text.split(DELIMITER);
+                if (pieces.size() >= MESSAGE::Section){
+                    qDebug() << pieces;
+                    //convert to int (nonce)
+                    QString textNonce = pieces[MESSAGE::Nonce];
+                    bool convertOk;
+                    int nonce = textNonce.toInt(&convertOk);
+                    if (!convertOk)
+                        break;
+                    //check if correct nonce
+                    if (nonce != wlObj->nonce + 1){
+                        qDebug() << "Sent nonce is "
+                                 << nonce
+                                 << " , my nonce is "
+                                 << wlObj->nonce;
+                    }
+                    //increase nonce
+                    Custom::nonceIncrement(wlObj->nonce);
+
+                    //convert to int(UserId)
+                    QString textUserid = pieces[MESSAGE::UserId];
+                    //convert to int
+                    textUserid.toInt(&convertOk);
+                    if (!convertOk)
+                        break;
+
+                    //remove nonce from msg
+                    pieces.removeFirst();
+                    //remove userId from msg
+                    pieces.removeFirst();
+
+                    //msg sent by user
+                    QString msg = pieces.join("");
+                    //send to all
+                    sendToAll(textUserid + DELIMITER + msg);
+                }
+            }
+            break;
+        }
+        case PROTOCOL_TYPE::ClientQuit:
+        {
+            // read packet
+            QByteArray iv, ciphertext;
+            //resize
+            iv.resize((int)PROTOCOL::IVSize);
+            ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
+            //add to qbytearry
+            dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
+            dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
+            //decrypt
+            QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
+            //convert to int
+            bool convertOk;
+            int userid = text.toInt(&convertOk);
+            if (!convertOk)
+                break;
+            if (userid == wlObj->userId){
+                int currentCount = connectedUser.size();
+                //change verified flag and disconnect
+                wlObj->verified = false;
+                wlObj->socket->disconnectFromHost();
+                //signal
+                emit updateCount(currentCount - 1);
+                //update all when client quit
+                sendToAll(text, PROTOCOL_TYPE::ClientQuit);
+            }
+            break;
+        }
+        case PROTOCOL_TYPE::Reject:
+        {
+            EType e;
+            dataStream >> e;
+            switch(e){
+            case ERROR::InvalidSessionNonce:
+            {
+                //send again
+                if (!wlObj->verified)
+                    sendPacket(wlObj, PROTOCOL_TYPE::TokenVerify, generateToken());
+                break;
+            }
+            //Illegal operation
+            default:
+                //ignore packet
+                break;
+            }
             break;
         }
         //Illegal operation
@@ -372,12 +388,9 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             //ignore packet
             break;
         }
-        break;
-    }
-    //Illegal operation
-    default:
-        //ignore packet
-        break;
+
+        //remove of consumed packets
+        data.remove(0, (int)dLength + PROTOCOL::HeaderSize);
     }
 }
 
