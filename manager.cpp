@@ -77,7 +77,7 @@ Manager::Manager(QObject *parent) : QObject(parent)
         // success, dont need update UI
     });
     // successful chat room deletion
-    connect(&httpsClient, &SSLClient::updateChatRoomSuccess, [this](){
+    connect(&httpsClient, &SSLClient::delChatRoomSuccess, [this](){
         // success, dont need update UI
     });
     // recieve error, display it
@@ -288,14 +288,12 @@ void Manager::showChatGroup()
      */
     //close server if on;
     if (socServer){
+        //delete server
         delete socServer;
         socServer = NULL;
+        //call to close group chat
+        httpsClient.delChatRoom(this->getUsername(),this->getToken());
         qDebug() << "Server closed";
-    }
-    //close client socket if on
-    if (socClient){
-        socClient->shut();
-        qDebug() << "Client related closed";
     }
     //reset groupName
     setGroupName("");
@@ -327,10 +325,14 @@ void Manager::connectToChatRoom(QString ip)
         });
         // error
         connect(socClient, &ChatClient::error, [this](QString errMsg){
+            //disconnect socket
+            socClient->shut();
             //quit chat room
             this->showChatGroup();
             //display error
             this->displayMessageBox(errMsg);
+            //debug
+            qDebug() << "Error recieve";
         });
         // new user connected
         connect(socClient, &ChatClient::userJoin, [this](QString user){
@@ -375,7 +377,10 @@ void Manager::showChatRoom()
     //make new chatRmUi
     chatRmUi = new Chatroom(startWindowUi, username);
     //connect chat room
-    connect(chatRmUi, SIGNAL(leaveRoom()), this, SLOT(showChatGroup()));
+    connect(chatRmUi, &Chatroom::leaveRoom, [this](){
+       //shut socket
+       socClient->shut();
+    });
     // sending msg to host
     connect(chatRmUi, &Chatroom::typeMsg, [this](QString msg){
         if (this->socClient){

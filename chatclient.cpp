@@ -68,6 +68,9 @@ bool ChatClient::connectToHost(QString ip)
         //connect for connect, disconnect and readyread
         connect(this->clientSoc, SIGNAL(connected()),this, SLOT(initConnection()));
         connect(this->clientSoc, &QTcpSocket::disconnected, [this](){
+            //self delete
+            this->clientSoc->deleteLater();
+            //emit error
             emit error("You have been disconnected");
         });
         connect(this->clientSoc, SIGNAL(readyRead()), this, SLOT(readPacket()));
@@ -89,10 +92,16 @@ void ChatClient::shut(){
      * Input: Nil
      * Output: Nil
      */
-    init();
-    clientSoc->abort();
-    clientSoc->deleteLater(); //auto delete
+    //if null mean has been reset, dont need to call twice
+    if (clientSoc){
+        //reset
+        init();
+        //disconnect if connected
+        if (clientSoc->state() == QTcpSocket::ConnectedState)
+            clientSoc->abort();
+    }
     clientSoc = NULL;
+
 }
 
 //packet
