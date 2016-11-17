@@ -17,7 +17,7 @@ SSLClient::SSLClient(QObject *parent) : QObject(parent)
     qDebug() << settings.fileName();
     baseURL = settings.value("server", "").toString();
     if (baseURL == ""){
-        settings.setValue("server", "https://changetoyourdomain.com");
+        settings.setValue("server", "https://localhost:8443/ChatServer");
         baseURL = settings.value("server", "").toString();
     }
 
