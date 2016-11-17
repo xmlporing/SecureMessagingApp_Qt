@@ -3,11 +3,9 @@
 SSLClient::SSLClient(QObject *parent) : QObject(parent)
 {
     manager = new QNetworkAccessManager(this);
-    // debug ssl errors
-    //connect(manager, SIGNAL(sslErrors(QNetworkReply *, const QList<QSslError> &)), this, SLOT(onSslErrors(QNetworkReply*, const QList<QSslError> &)));
 
     // ignore self-signed cert issues
-    QList<QSslCertificate> cert = QSslCertificate::fromPath(":/cert/apache.crt");
+    QList<QSslCertificate> cert = QSslCertificate::fromPath(":/cert/cert.pem");
     expectedSslErrors.append(QSslError(QSslError::SelfSignedCertificate, cert.at(0)));
     expectedSslErrors.append(QSslError(QSslError::HostNameMismatch,cert.at(0)));
     expectedSslErrors.append(QSslError(QSslError::CertificateUntrusted ,cert.at(0)));

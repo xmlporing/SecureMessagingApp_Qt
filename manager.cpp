@@ -157,6 +157,8 @@ void Manager::displayMessageBox(QString msg){
      * Input: Error message
      * Output: QMessageBox with only "OK" option
      */
+    //close loadWaitScreen
+    this->loadWaitScreen(false);
     QMessageBox::warning(currentUi, "System Message", msg,QMessageBox::Ok);
 }
 
