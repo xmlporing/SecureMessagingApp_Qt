@@ -3,12 +3,10 @@
 SSLClient::SSLClient(QObject *parent) : QObject(parent)
 {
     manager = new QNetworkAccessManager(this);
-
-    // ignore self-signed cert issues
-    QList<QSslCertificate> cert = QSslCertificate::fromPath(":/cert/cert.pem");
-    expectedSslErrors.append(QSslError(QSslError::SelfSignedCertificate, cert.at(0)));
-    expectedSslErrors.append(QSslError(QSslError::HostNameMismatch,cert.at(0)));
-    expectedSslErrors.append(QSslError(QSslError::CertificateUntrusted ,cert.at(0)));
+    //ignore all warning
+    connect(manager, &QNetworkAccessManager::sslErrors, [](QNetworkReply* errReply, const QList<QSslError>& errorlist){
+       errReply->ignoreSslErrors(errorlist);
+    });
 
     // read from config file
     QSettings settings("config.ini",QSettings::IniFormat);
@@ -36,7 +34,7 @@ void SSLClient::registerAcc(const QString &username, const QString &password)
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveRegistration();
     });
@@ -55,7 +53,7 @@ void SSLClient::loginToken(const QString &username, const QString &password)
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveLoginToken(username);
     });
@@ -76,7 +74,7 @@ void SSLClient::logoutAcc(const QString &username, const QString &token)
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveLogout();
     });
@@ -98,7 +96,7 @@ void SSLClient::getChatRoom(const QString &username, const QString &token)
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveChatGroupList();
     });
@@ -123,7 +121,7 @@ void SSLClient::createChatRoom(const QString &username, const QString &token,
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request,jsonPost);//(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveCreateChatRoom();
     });
@@ -145,7 +143,7 @@ void SSLClient::joinChatRoom(const QString &username, const QString &token,
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveJoinChatRoom();
     });
@@ -166,7 +164,7 @@ void SSLClient::updateChatRoom(const QString &username,
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->put(request,jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveUpdateChatRoom();
     });
@@ -186,7 +184,7 @@ void SSLClient::delChatRoom(const QString &username, const QString &token)
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
     reply = manager->post(request,jsonPost);//(request, jsonPost);
-    reply->ignoreSslErrors(expectedSslErrors);
+
     connect(reply, &QNetworkReply::finished, [this, username](){
         recieveDelChatRoom(); //***
     });
@@ -365,6 +363,7 @@ void SSLClient::recieveUpdateChatRoom(){
     QJsonValue success = QJsonObject(itemDoc.object())["response"];
     QJsonValue responseMsg = QJsonObject(itemDoc.object())["responseMessage"];
     if ((success.isString() && success.toString() == "success") || true){
+        qDebug() << "Update server";
         emit updateChatRoomSuccess();
     }else
     // handle non string error or no "token" key error

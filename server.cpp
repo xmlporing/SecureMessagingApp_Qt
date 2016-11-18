@@ -491,6 +491,9 @@ void Server::incomingConnection(qintptr socketDescriptor)
     //append to connectedUser aka whitelist
     connectedUser.append(whitelistStruct);
 
+    //update chatroom count
+    emit updateCount(connectedUser.size());
+
     //connect signal
     // packet in socket
     connect(client, &QTcpSocket::readyRead, [this,whitelistStruct]()
@@ -506,6 +509,8 @@ void Server::incomingConnection(qintptr socketDescriptor)
         //notify all if verified user leave
         if (whitelistStruct->verified)
             sendToAll(QString::number(whitelistStruct->userId),PROTOCOL_TYPE::ClientQuit);
+        //update chatroom count
+        emit updateCount(connectedUser.size());
         //this connection is no longer verified
         whitelistStruct->verified = false;
     });
