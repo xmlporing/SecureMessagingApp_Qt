@@ -10,6 +10,7 @@ Chatgroup::Chatgroup(QWidget *parent) :
     ui->setupUi(this);
     //set single selection
     ui->listChatgroup->setSelectionMode(QAbstractItemView::SingleSelection);
+    flag = false;
 }
 
 Chatgroup::~Chatgroup()
@@ -70,6 +71,11 @@ void Chatgroup::on_joinButton_clicked()
      *      2) Display error msg when no chat room selected
      *      3) Display error msg when unsuccessfully connect to chat room
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
     //check for selected
     QList<QListWidgetItem*> selected = this->ui->listChatgroup->selectedItems();
     //check if there is selected
@@ -98,6 +104,11 @@ void Chatgroup::on_logoutButton_clicked()
      * Input: Nil
      * Output: Attempt to clear session token in web server (logout)
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
     emit goMain();
 }
 
@@ -110,6 +121,12 @@ void Chatgroup::on_createGroupbtn_clicked()
      * Input: Nil
      * Output: Show create group UI
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
+    //make group
     emit makeGroup();
 }
 
@@ -122,5 +139,15 @@ void Chatgroup::on_refreshButton_clicked()
      * Input: Nil
      * Output: Clear current chat group list and get updated list
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
+    //refresh list
     refreshList();
+}
+
+void Chatgroup::clearFlag(){
+    flag = false;
 }

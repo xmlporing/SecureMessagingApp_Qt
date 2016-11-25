@@ -9,6 +9,7 @@
 #include <QNetworkInterface>
 #include <QDataStream>
 #include "network.h"
+#include "library.h"
 
 class Server : public QTcpServer
 {
@@ -51,12 +52,15 @@ public:
     void sendPacket(whiteListObj* wlObj, TType t, QString contents);
     //key
     void setMasterKey(QString key);
+    //set host username
+    void setUsername(QString username);
 
 private:
     QVector<whiteListObj*> connectedUser;
     int currentId;
     int maxCount;
     CryptoPP::SecByteBlock masterKey;
+    QString ownUsername;
 
     void processIncomingData(QByteArray data, whiteListObj* wlObj);
     bool compareIP(const QHostAddress & ip);
@@ -66,6 +70,7 @@ private:
 signals:
     void updateCount(int count);
     void error(QString errormsg);
+    void delGrp();
 
 public slots:
     void sendToAll(QString data, TType t = PROTOCOL_TYPE::Message);

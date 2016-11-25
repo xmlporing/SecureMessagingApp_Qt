@@ -20,16 +20,19 @@ public:
 
 private:
     Ui::MainWindow *ui;
+    bool flag;
 
 signals:
     void signIn(QString username, QString pass);
     void createAcc();
+    void errorOccur(QString errMsg);
 
 private slots:
     void on_signInbtn_clicked();
     void on_createAccbtn_clicked();
     void on_actionExit_triggered();
     void on_actionAbout_triggered();
+    void clearFlag();
 };
 
 #endif // MAINWINDOW_H

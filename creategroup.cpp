@@ -11,6 +11,7 @@ CreateGroup::CreateGroup(QWidget *parent) :
     //set inputmask
     ui->groupSize->setInputMask("00"); //max 99 connections
     ui->ip->setInputMask("000.000.000.000"); //ip mask
+    flag = false;
 }
 
 CreateGroup::~CreateGroup()
@@ -28,6 +29,12 @@ void CreateGroup::on_backButton_clicked()
      * Input: Nil
      * Output: Show chat group UI
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
+    //return from creation
     emit cancelCreate();
 }
 
@@ -43,6 +50,11 @@ void CreateGroup::on_createGroupbtn_clicked()
      *      2) Display error msg when unsuccessfully host chat server
      *      3) Display error msg when unsuccessfully communicate with web server
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
     //get from inputs
     QString groupName = this->ui->groupName->text();
     int groupSize = this->ui->groupSize->text().toInt();
@@ -67,4 +79,8 @@ void CreateGroup::on_createGroupbtn_clicked()
     }
     //emit validated inputs
     emit createdGroup(groupName, groupSize, groupCount, ip);
+}
+
+void CreateGroup::clearFlag(){
+    flag = false;
 }

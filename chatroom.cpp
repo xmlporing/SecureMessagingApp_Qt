@@ -38,8 +38,15 @@ void Chatroom::displayMsg(QString sender, QString msg)
     //get current time
     QTime time = QTime::currentTime();
     QString timeString = time.toString();
+    //convert to string
+    QString outputMsg = QString("%1 [%2] : %3").arg(sender,timeString,msg);
+    //Escape html
+    QTextCursor cursor = QTextCursor(ui->textBrowser->document());
+    cursor.movePosition(QTextCursor::End);
+    //insert new line
+    cursor.insertBlock();
     //output formatted msg with timestamp
-    ui->textBrowser->append(QString("%1 [%2] : %3").arg(sender,timeString,msg));
+    cursor.insertText(outputMsg);
 }
 
 void Chatroom::addUser(QString username){

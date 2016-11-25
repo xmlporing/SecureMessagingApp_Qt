@@ -22,7 +22,7 @@
  * All value in bits
  * Init             -> HEADER
  * TokenVerify      -> HEADER | token(16)
- * ServerVerify     -> HEADER | IV(16) | E(token(16)|session_key(base64))
+ * ServerVerify     -> HEADER | IV(16) | E("username,token(16),session_key(base64)")
  * SendNonce        -> HEADER | IV(16) | E("session_nonce,id,")
  * UserDetails      -> HEADER | IV(16) | E(username)
  * Message          -> HEADER | IV(16) | E("session_nonce,userid,msg")
@@ -75,6 +75,9 @@ enum MESSAGE{
     Nonce = 0,
     UserId = 1,
     MsgValue = 2,
+    Username = 0,
+    Token = 1,
+    SessionKey = 2,
 };
 
 enum ERROR{

@@ -109,6 +109,13 @@
    </property>
   </widget>
  </widget>
+ <tabstops>
+  <tabstop>groupName</tabstop>
+  <tabstop>groupSize</tabstop>
+  <tabstop>ip</tabstop>
+  <tabstop>createGroupbtn</tabstop>
+  <tabstop>backButton</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

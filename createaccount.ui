@@ -129,6 +129,13 @@
   <zorder>newCPassword</zorder>
   <zorder>newUserName</zorder>
  </widget>
+ <tabstops>
+  <tabstop>newUserName</tabstop>
+  <tabstop>newCPassword</tabstop>
+  <tabstop>newPassword</tabstop>
+  <tabstop>createAccountbtn</tabstop>
+  <tabstop>backbtn</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

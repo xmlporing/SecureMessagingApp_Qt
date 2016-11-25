@@ -2,12 +2,13 @@
 
 SSLClient::SSLClient(QObject *parent) : QObject(parent)
 {
+    //init
     manager = new QNetworkAccessManager(this);
+    reply = NULL;
     //ignore all warning
     connect(manager, &QNetworkAccessManager::sslErrors, [](QNetworkReply* errReply, const QList<QSslError>& errorlist){
        errReply->ignoreSslErrors(errorlist);
     });
-
     // read from config file
     QSettings settings("config.ini",QSettings::IniFormat);
     qDebug() << settings.fileName();

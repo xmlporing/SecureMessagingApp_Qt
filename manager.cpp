@@ -35,6 +35,9 @@ Manager::Manager(QObject *parent) : QObject(parent)
     connect(startWindowUi, SIGNAL(signIn(QString, QString)),
             this, SLOT(login(QString, QString)));
     connect(startWindowUi, SIGNAL(createAcc()), this, SLOT(registerAcc()));
+    connect(startWindowUi, &MainWindow::errorOccur, [this](QString errMsg){
+       this->displayMessageBox(errMsg);
+    });
 
     //https client, communication to web server
     // successful login
@@ -451,6 +454,8 @@ void Manager::hostServer(int groupSize)
         qDebug() << "No issue";
         //set masterkey for token verification
         socServer->setMasterKey(this->token);
+        //set host username
+        socServer->setUsername(this->getUsername());
         qDebug() << "Connecting signal";
         //connect signal
         // update web server count
@@ -463,6 +468,11 @@ void Manager::hostServer(int groupSize)
         connect(socServer, &Server::error, [this](QString errMsg){
            //display error
            this->displayMessageBox(errMsg);
+        });
+        // quit chat room
+        connect(socServer, &Server::delGrp, [this](){
+           //update server
+            this->httpsClient.delChatRoom(this->getUsername(),this->getToken());
         });
         qDebug() << "socServer setup hao le";
     }else{

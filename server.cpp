@@ -52,11 +52,13 @@ void Server::closeServer()
      */
     //close this server to prevent more incoming connections
     this->close();
+    //update server
+    emit delGrp();
     //clearing
     int i = 0;
     //sending "host quit" to all verified and connected user
     for (; i < connectedUser.size(); i++){
-        if (connectedUser.at(i)->verified)
+        if ( connectedUser.at(i)->socket && connectedUser.at(i)->socket->state() == QAbstractSocket::ConnectedState)
             sendPacket(connectedUser.at(i), PROTOCOL_TYPE::HostQuit, QString::number(connectedUser.at(i)->nonce));
     }
     //removing all object
@@ -147,6 +149,16 @@ void Server::setMasterKey(QString key){
         emit error("There is some problem with the login, please logout and try again later.");
 }
 
+void Server::setUsername(QString username){
+    /*
+     * This function will set username
+     *
+     * Input: QString username
+     * Output: Nil
+     */
+    this->ownUsername = username;
+}
+
 // ******* Private function *******
 
 void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
@@ -165,6 +177,7 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
      *      2) const whiteListObj* wlObj -> connected user
      * Output: Nil
      */
+    qDebug() << "Server: " + data;
     while (data.size() > 0){
         // check if data is smaller than expected
         if (data.size() < PROTOCOL::HeaderSize)
@@ -177,10 +190,11 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
         TType dType = 0x0000;// = static_cast<qint16>data.mid(PROTOCOL::Type,PROTOCOL::TypeSize);
         dataStream >> dType;
 
-        // check for length and length of value is valid
+        // check for length
         LType dLength = 0x00000000;// = static_cast<qint32>(data.mid(PROTOCOL::Length,PROTOCOL::LengthSize));
+        // check for valid length
         dataStream >> dLength;
-        if (data.size() < (int)dLength + PROTOCOL::HeaderSize){
+        if (data.size() < (int)dLength + PROTOCOL::HeaderSize || (int)dLength < 0){
             qDebug() << "Different in length, packet size: "
                      << data.size()
                      << " , length value: "
@@ -191,6 +205,13 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
                      << data;
             rejectPacket(wlObj,ERROR::InvalidSize);
             return;
+        }
+        // check for invalid size length
+        if ((int)dLength > MAX_INPUT_CHAR){
+            //remove excessive packets
+            data.remove(0, (int)dLength + PROTOCOL::HeaderSize);
+            //continue without processing
+            continue;
         }
 
         switch (dType){
@@ -215,6 +236,7 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
                 stream.writeRawData(token.toLocal8Bit(), token.size());
 
                 wlObj->socket->write(data2, PROTOCOL::HeaderSize + token.size());
+                qDebug() << "Init: " + data2;
             }
             break;
         case PROTOCOL_TYPE::ServerVerify:
@@ -229,49 +251,40 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
             //decrypt
             QString text = Custom::decrypt(this->masterKey, iv, ciphertext);
-            //convert to qbytearray
-            QByteArray contents = text.toLocal8Bit();
-            //token from byte 0 to 15
-            QString sendToken = QString::fromLocal8Bit(contents.mid(0,PROTOCOL::TokenSize));
-            if (sendToken == wlObj->token){
-                //if same set, session key
-                QString obtainedKey = QString::fromLocal8Bit(contents.mid(PROTOCOL::TokenSize,dLength - PROTOCOL::TokenSize));
-                //key from byte 16 to dLength
-                if (!Custom::setKey( wlObj->key,obtainedKey)){
-                    rejectPacket(wlObj, ERROR::InvalidToken);
-                }else{
-                    //generate nonce
-                    wlObj->nonce = generateNonce();
-                    //send nonce and allocated id
-                    sendPacket(wlObj, PROTOCOL_TYPE::SendNonce,
-                               QString::number(wlObj->nonce) + DELIMITER + QString::number(wlObj->userId) + DELIMITER);
+            qDebug() << "decrypted server verify: " + text;
+            QStringList pieces = text.split(DELIMITER);
+            if (pieces.size() == MESSAGE::Section){
+                //check token
+                QString sendToken = pieces[MESSAGE::Token];
+                if (sendToken == wlObj->token){
+                    //update username
+                    wlObj->userName = pieces[MESSAGE::Username];
+                    //update verification status
+                    wlObj->verified = true;
+                    //set key
+                    if (!Custom::setKey( wlObj->key,pieces[MESSAGE::SessionKey])){
+                        rejectPacket(wlObj, ERROR::InvalidToken);
+                    }else{
+                        //generate nonce
+                        wlObj->nonce = generateNonce();
+                        //send nonce and allocated id
+                        sendPacket(wlObj, PROTOCOL_TYPE::SendNonce,
+                                   QString::number(wlObj->nonce) + DELIMITER + QString::number(wlObj->userId) + DELIMITER);
+                        //loop to send current userlist
+                        for (int i = 0; i < connectedUser.size(); i++){
+                            sendPacket(wlObj, PROTOCOL_TYPE::ClientJoin,
+                                       DELIMITER + QString::number(connectedUser.at(i)->userId) + DELIMITER + connectedUser.at(i)->userName);
+                        }
+                        //send to all clientJoin
+                        sendToAll(DELIMITER + QString::number(wlObj->userId) + DELIMITER + wlObj->userName  , PROTOCOL_TYPE::ClientJoin);
+                    }
                 }
             }
             break;
         }
         case PROTOCOL_TYPE::UserDetails:
         {
-            //compare with own secret ***
-            QByteArray iv, ciphertext;
-            //resize
-            iv.resize((int)PROTOCOL::IVSize);
-            ciphertext.resize((int)dLength - PROTOCOL::IVSize); //without iv
-            //add to qbytearry
-            dataStream.readRawData(iv.data(), (int)PROTOCOL::IVSize);
-            dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
-            //decrypt
-            QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
-            //update username
-            wlObj->userName = text;
-            //update verification status
-            wlObj->verified = true;
-            //loop to send current userlist
-            for (int i = 0; i < connectedUser.size(); i++){
-                sendPacket(wlObj, PROTOCOL_TYPE::ClientJoin,
-                           DELIMITER + QString::number(connectedUser.at(i)->userId) + DELIMITER + connectedUser.at(i)->userName);
-            }
-            //send to all clientJoin
-            sendToAll(DELIMITER + QString::number(wlObj->userId) + DELIMITER + text, PROTOCOL_TYPE::ClientJoin);
+            //Deprecated since version 1.1
             break;
         }
         case PROTOCOL_TYPE::Message:
@@ -288,6 +301,7 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
                 dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
                 //decrypt
                 QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
+                qDebug() << "decrypted message: " + text;
                 //split by DELIMITER
                 QStringList pieces = text.split(DELIMITER);
                 if (pieces.size() >= MESSAGE::Section){
@@ -337,6 +351,7 @@ void Server::processIncomingData(QByteArray data, whiteListObj* wlObj){
             dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
             //decrypt
             QString text = Custom::decrypt(wlObj->key, iv, ciphertext);
+            qDebug() << "Client quit recieved: " + text;
             //convert to int
             bool convertOk;
             int userid = text.toInt(&convertOk);
@@ -483,13 +498,19 @@ void Server::incomingConnection(qintptr socketDescriptor)
                                                       this->currentId++,
                                                       client,
                                                       verify);
+    //append to connectedUser aka whitelist
+    connectedUser.append(whitelistStruct);
+
     if (verify){ //own client, skip server verification
+        //set username
+        whitelistStruct->userName = this->ownUsername;
         //send nonce
         whitelistStruct->nonce = generateNonce();
         sendPacket(whitelistStruct, PROTOCOL_TYPE::SendNonce, QString::number(whitelistStruct->nonce) + DELIMITER + QString::number(whitelistStruct->userId) + DELIMITER);
+        //send that client joined
+        sendToAll(DELIMITER + QString::number(whitelistStruct->userId) + DELIMITER + whitelistStruct->userName, PROTOCOL_TYPE::ClientJoin);
     }
-    //append to connectedUser aka whitelist
-    connectedUser.append(whitelistStruct);
+
 
     //update chatroom count
     emit updateCount(connectedUser.size());
@@ -509,10 +530,12 @@ void Server::incomingConnection(qintptr socketDescriptor)
         //notify all if verified user leave
         if (whitelistStruct->verified)
             sendToAll(QString::number(whitelistStruct->userId),PROTOCOL_TYPE::ClientQuit);
-        //update chatroom count
-        emit updateCount(connectedUser.size());
         //this connection is no longer verified
         whitelistStruct->verified = false;
+        //remove unconnected
+        connectedUser.removeAll(whitelistStruct);
+        //update chatroom count
+        emit updateCount(connectedUser.size());
     });
 
 }

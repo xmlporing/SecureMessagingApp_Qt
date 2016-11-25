@@ -23,9 +23,11 @@ private slots:
     void on_logoutButton_clicked();
     void on_createGroupbtn_clicked();
     void on_refreshButton_clicked();
+    void clearFlag();
 
 private:
     Ui::Chatgroup *ui;
+    bool flag;
 
 signals:
     void errorOccur(QString warningmsg);

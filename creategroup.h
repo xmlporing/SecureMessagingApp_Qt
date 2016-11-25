@@ -18,10 +18,12 @@ public:
 
 private:
     Ui::CreateGroup *ui;
+    bool flag;
 
 private slots:
     void on_backButton_clicked();
     void on_createGroupbtn_clicked();
+    void clearFlag();
 
 signals:
     void errorOccur(QString warningmsg);

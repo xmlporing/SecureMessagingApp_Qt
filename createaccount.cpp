@@ -8,6 +8,7 @@ CreateAccount::CreateAccount(QWidget *parent) :
 {
     //default ui setup
     ui->setupUi(this);
+    flag = false;
 }
 
 CreateAccount::~CreateAccount()
@@ -39,24 +40,38 @@ void CreateAccount::on_createAccountbtn_clicked()
      *      1) Error msg for invalid username/password
      *      2) Success msg for successful registration
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
+    //check for username
     QString username = this->ui->newUserName->text();
     QString password1 = this->ui->newPassword->text();
     QString password2 = this->ui->newCPassword->text();
-    QRegularExpression regex("^[a-zA-Z0-9]{8,16}$");
+    //password don't match
     if (password1 != password2){
         emit errorOccur("Password don't match.");
         return;
     }
-    QRegularExpressionMatch match = regex.match(password1);
-    if (!match.hasMatch()){
-        emit errorOccur("Invalid password entered.");
-        return;
-    }
-    match = regex.match(username);
+    //check for valid username
+    QRegularExpression userRegex(USERNAME_REGEX);
+    QRegularExpressionMatch match = userRegex.match(username);
     if (!match.hasMatch()){
         emit errorOccur("Invalid username entered.");
         return;
     }
+    //check for valid password
+    QRegularExpression passRegex(PASS_REGEX);
+    match = passRegex.match(password1);
+    if (!match.hasMatch()){
+        emit errorOccur("Invalid password entered.");
+        return;
+    }
     //register validated user account to web server
     emit registerAcc(username, password1);
+}
+
+void CreateAccount::clearFlag(){
+    flag = false;
 }

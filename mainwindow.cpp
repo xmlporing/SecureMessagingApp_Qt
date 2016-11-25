@@ -8,6 +8,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     //default ui setup
     ui->setupUi(this);
+    flag = false;
 }
 
 MainWindow::~MainWindow()
@@ -37,9 +38,28 @@ void MainWindow::on_signInbtn_clicked()
      * Input: Nil
      * Output: Attempt to login with user inputs
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
     //get from user inputs
     QString username = ui->userName->text();
     QString pass = ui->passWord->text();
+    //check for valid username
+    QRegularExpression userRegex(USERNAME_REGEX);
+    QRegularExpressionMatch match = userRegex.match(username);
+    if (!match.hasMatch()){
+        emit errorOccur("Invalid username entered.");
+        return;
+    }
+    //check for valid password
+    QRegularExpression passRegex(PASS_REGEX);
+    match = passRegex.match(pass);
+    if (!match.hasMatch()){
+        emit errorOccur("Invalid password entered.");
+        return;
+    }
     //sign in
     emit signIn(username,pass);
 }
@@ -53,6 +73,11 @@ void MainWindow::on_createAccbtn_clicked()
      * Input: Nil
      * Output: Show registration UI
      */
+    //prevent spam
+    if (flag)
+        return;
+    flag = true;
+    QTimer::singleShot(TIME_PREVENT_SPAM, this, SLOT(clearFlag()));
     //show registration UI
     emit createAcc();
 }
@@ -79,4 +104,8 @@ void MainWindow::on_actionAbout_triggered() {
     QMessageBox msgBox;
     msgBox.setText("Secure Messaging Application created by Team 8 for ICT3103.");
     msgBox.exec();
+}
+
+void MainWindow::clearFlag(){
+    flag = false;
 }

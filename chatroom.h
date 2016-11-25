@@ -2,7 +2,6 @@
 #define CHATROOM_H
 
 #include "library.h"
-#include <QTimer>
 
 namespace Ui {
 class Chatroom;

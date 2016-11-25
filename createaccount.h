@@ -18,10 +18,12 @@ public:
 
 private:
     Ui::CreateAccount *ui;
+    bool flag;
 
 private slots:
     void on_backbtn_clicked();
     void on_createAccountbtn_clicked();
+    void clearFlag();
 
 signals:
     void registerAcc(QString username, QString password);

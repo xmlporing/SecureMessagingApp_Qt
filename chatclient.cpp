@@ -69,6 +69,8 @@ bool ChatClient::connectToHost(QString ip)
         //connect for connect, disconnect and readyread
         connect(this->clientSoc, SIGNAL(connected()),this, SLOT(initConnection()));
         connect(this->clientSoc, &QTcpSocket::disconnected, [this](){
+            //abort
+            this->clientSoc->abort();
             //self delete
             this->clientSoc->deleteLater();
             //set checkDisconnect flag
@@ -195,6 +197,8 @@ void ChatClient::readPacket()
     // read all data in packet
     QByteArray data = clientSoc->readAll();
 
+    qDebug() << "Client: " + data;
+
     while (data.size() > 0){
         // check if data is smaller than expected
         if (data.size() < PROTOCOL::HeaderSize)
@@ -259,8 +263,8 @@ void ChatClient::readPacket()
                 }
                 //update connectivity
                 this->connectionState = true;
-                //send username to server
-                sendPacket(PROTOCOL_TYPE::UserDetails, this->ownUsername);
+                //send username to server **Deprecated
+                //sendPacket(PROTOCOL_TYPE::UserDetails, this->ownUsername);
             }
             break;
         }
@@ -328,6 +332,7 @@ void ChatClient::readPacket()
             dataStream.readRawData(ciphertext.data(), (int)dLength - PROTOCOL::IVSize);
             //decrypt
             QString text = Custom::decrypt(this->key, iv, ciphertext);
+            qDebug() << "ClientJoin: " + text;
             //split by DELIMITER
             QStringList pieces = text.split(DELIMITER);
             if (pieces.size() == MESSAGE::Section){
